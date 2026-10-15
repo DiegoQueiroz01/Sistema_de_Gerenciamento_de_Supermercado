@@ -88,6 +88,12 @@ menus:
 - `DashboardService`: métricas de estoque e atendimento, incluindo mais
   vendidos, caixas abertos, filas, atendimentos e tempo médio de espera.
 
+O `QueueService` e as entidades de caixa já implementam a abertura/fechamento,
+a distribuição de chegadas para a menor fila, a transferência manual para o
+final de outra fila e o registro do tempo entre chegada e início do atendimento.
+Ao fechar um caixa com clientes aguardando, eles são redistribuídos para caixas
+abertos; se não houver destino, o fechamento é recusado.
+
 ### Domínio
 
 Os modelos representam o supermercado; usuários e seus perfis; produtos e

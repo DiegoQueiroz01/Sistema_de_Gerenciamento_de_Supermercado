@@ -29,9 +29,3 @@ não está definida pelos relatórios e não foi incluída nesta estrutura.
 
 Veja [docs/architecture.md](docs/architecture.md) para o detalhamento dos módulos,
 responsabilidades e regras contempladas.
-
-## Estado atual
-
-Este repositório contém somente a arquitetura e os arquivos de estrutura. Os
-arquivos Java estão intencionalmente vazios; a implementação será feita quando
-solicitada.
