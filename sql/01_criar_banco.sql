@@ -1,4 +1,4 @@
--- Esquema do Mercado Fácil (nomes em português)
+-- Banco de dados do Mercado Fácil 
 CREATE DATABASE IF NOT EXISTS mercado_facil CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE mercado_facil;
 
