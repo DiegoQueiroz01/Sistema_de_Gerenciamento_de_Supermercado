@@ -118,7 +118,8 @@ public final class ProductAdminMenu extends StockMenuBase {
             inventory.registerEntry(p.code(), quantity, responsible, now); // estoque inicial = ENTRY
         }
         success("Produto cadastrado: " + p.name());
-        warnIfBelowMinimum(p);
+        // Relê o produto: com MySQL cada consulta devolve uma cópia nova.
+        warnIfBelowMinimum(products.requireByCode(p.code()));
     }
 
     private void editProduct() {
@@ -139,7 +140,7 @@ public final class ProductAdminMenu extends StockMenuBase {
         int minimum = minText.isEmpty() ? p.minimumStock() : parseInt(minText);
         products.edit(p.code(), name, category, price, minimum);
         success("Produto atualizado. (A quantidade só muda por movimentações.)");
-        warnIfBelowMinimum(p);
+        warnIfBelowMinimum(products.requireByCode(p.code()));
     }
 
     private void defineMinimumStock() {
@@ -150,7 +151,7 @@ public final class ProductAdminMenu extends StockMenuBase {
                 + p.minimumStock() + "): ", 0, 1_000_000);
         products.defineMinimumStock(p.code(), minimum);
         success("Estoque mínimo atualizado para " + minimum + ".");
-        warnIfBelowMinimum(p);
+        warnIfBelowMinimum(products.requireByCode(p.code()));
     }
 
     private static double parseDecimal(String text) {
