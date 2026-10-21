@@ -13,6 +13,8 @@
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Classe padrão do "mvn exec:java"; pode ser trocada com -Dexec.mainClass=... -->
+        <exec.mainClass>br.com.supermercado.MercadoFacilApp</exec.mainClass>
     </properties>
 
     <dependencies>
@@ -34,9 +36,6 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
-                <configuration>
-                    <mainClass>br.com.supermercado.MercadoFacilApp</mainClass>
-                </configuration>
             </plugin>
         </plugins>
     </build>

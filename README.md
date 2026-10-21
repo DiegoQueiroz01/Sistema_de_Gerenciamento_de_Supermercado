@@ -20,12 +20,83 @@ O projeto segue uma separação em camadas:
 - `application`: serviços que coordenam os casos de uso.
 - `repositories`: contratos de acesso aos dados.
 - `infrastructure/memory`: armazenamento em memória e estruturas de dados.
+- `infrastructure/mysql`: armazenamento de produtos e estoque no MySQL.
 - `presentation/cli`: menus, leitura de comandos e apresentação no terminal.
 
-O armazenamento inicial está planejado para memória, alinhado às estruturas de
-dados dos relatórios: mapa por código para produtos, listas para consultas e
-históricos e filas para o atendimento. Persistência em arquivo ou banco de dados
-não está definida pelos relatórios e não foi incluída nesta estrutura.
+O armazenamento em memória segue as estruturas de dados dos relatórios: mapa por
+código para produtos, listas para consultas e históricos e filas para o
+atendimento. Produtos, categorias e movimentações de estoque também podem ser
+gravados no MySQL.
 
 Veja [docs/architecture.md](docs/architecture.md) para o detalhamento dos módulos,
 responsabilidades e regras contempladas.
+
+## Como executar
+
+### Requisitos
+
+- JDK 17 ou superior.
+- Maven 3.9 ou superior (`mvn -version`).
+- MySQL 8, apenas para a versão com banco de dados.
+
+Todos os comandos abaixo são executados na pasta que contém o `pom.xml`.
+
+### Demonstração em memória (sem banco de dados)
+
+Abre os menus do estoquista e do administrador com dados de exemplo já
+carregados, sem login e sem MySQL:
+
+```bash
+mvn compile exec:java -Dexec.mainClass=br.com.supermercado.E1Demo -Dexec.classpathScope=test
+```
+
+### Testes
+
+```bash
+mvn compile exec:java -Dexec.mainClass=br.com.supermercado.E1Tests -Dexec.classpathScope=test
+```
+
+O resultado aparece no final, por exemplo: `Resultado: 37 passaram, 0 falharam.`
+
+### Aplicação com MySQL
+
+1. Crie o banco e as tabelas executando `sql/01_criar_banco.sql` no MySQL
+   (pelo MySQL Workbench ou pelo terminal):
+
+   ```bash
+   mysql -u root -p < sql/01_criar_banco.sql
+   ```
+
+2. Opcional: carregue os dados de exemplo.
+
+   ```bash
+   mysql -u root -p < sql/02_inserir_dados.sql
+   ```
+
+3. Informe as credenciais do MySQL por variáveis de ambiente.
+
+   Linux/macOS:
+
+   ```bash
+   export MERCADO_DB_USUARIO=root
+   export MERCADO_DB_SENHA='sua_senha'
+   ```
+
+   Windows (PowerShell):
+
+   ```powershell
+   $env:MERCADO_DB_USUARIO = "root"
+   $env:MERCADO_DB_SENHA = "sua_senha"
+   ```
+
+   Por padrão a conexão usa `jdbc:mysql://localhost:3306/mercado_facil`. Para
+   outro endereço ou porta, defina também `MERCADO_DB_URL`.
+
+4. Execute:
+
+   ```bash
+   mvn clean compile exec:java
+   ```
+
+Não coloque senhas reais em arquivos versionados. Mais detalhes sobre o banco
+estão em [LEIA-ME-MYSQL.md](LEIA-ME-MYSQL.md).
