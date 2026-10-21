@@ -55,7 +55,9 @@ public final class StockistMenu extends StockMenuBase {
             return;
         }
         inventory.registerEntry(p.code(), quantity, responsible);
-        success("Entrada registrada. Saldo atual: " + p.quantity() + " un");
-        warnIfBelowMinimum(p);
+        // Relê o produto: com MySQL cada consulta devolve uma cópia nova.
+        Product updated = products.requireByCode(p.code());
+        success("Entrada registrada. Saldo atual: " + updated.quantity() + " un");
+        warnIfBelowMinimum(updated);
     }
 }

@@ -1,7 +1,7 @@
 # Mercado Fácil — configuração MySQL
 
 ## 1. Requisitos
-- JDK 21 (ou compatível com o `pom.xml`)
+- JDK 17 ou superior (o `pom.xml` compila para Java 17)
 - MySQL Server em execução e MySQL Workbench
 - Maven instalado (`mvn -version`)
 
