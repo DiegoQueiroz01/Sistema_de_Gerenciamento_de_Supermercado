@@ -47,13 +47,28 @@ Abre os menus do estoquista e do administrador com dados de exemplo já
 carregados, sem login e sem MySQL:
 
 ```bash
-mvn compile exec:java -Dexec.mainClass=br.com.supermercado.E1Demo -Dexec.classpathScope=test
+mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E1Demo -Dexec.classpathScope=test
+```
+
+Para o menu de caixas e filas, com 5 caixas (3 abertos), 7 clientes e 2
+atendimentos já carregados:
+
+```bash
+mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E2Demo -Dexec.classpathScope=test
 ```
 
 ### Testes
 
+Produtos e estoque:
+
 ```bash
-mvn compile exec:java -Dexec.mainClass=br.com.supermercado.E1Tests -Dexec.classpathScope=test
+mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E1Tests -Dexec.classpathScope=test
+```
+
+Caixas e filas:
+
+```bash
+mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E2Tests -Dexec.classpathScope=test
 ```
 
 O resultado aparece no final, por exemplo: `Resultado: 37 passaram, 0 falharam.`

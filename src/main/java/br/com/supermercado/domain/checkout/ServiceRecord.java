@@ -4,29 +4,37 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
+/** Registro histórico de um atendimento: dados do cliente, do caixa e do início do atendimento. */
 public record ServiceRecord(
         long id,
         String checkoutId,
-        long customerId,
-        LocalDateTime arrivalTime,
+        Customer customer,
         LocalDateTime serviceStartedAt) {
 
     public ServiceRecord {
-        if (id <= 0 || customerId <= 0) {
-            throw new IllegalArgumentException("Os identificadores devem ser positivos.");
+        if (id <= 0) {
+            throw new IllegalArgumentException("O identificador do registro deve ser positivo.");
         }
         if (checkoutId == null || checkoutId.isBlank()) {
             throw new IllegalArgumentException("O identificador do caixa é obrigatório.");
         }
-        Objects.requireNonNull(arrivalTime, "O horário de chegada é obrigatório.");
+        Objects.requireNonNull(customer, "O cliente é obrigatório.");
         Objects.requireNonNull(serviceStartedAt, "O início do atendimento é obrigatório.");
-        if (serviceStartedAt.isBefore(arrivalTime)) {
+        if (serviceStartedAt.isBefore(customer.arrivalTime())) {
             throw new IllegalArgumentException(
                     "O atendimento não pode começar antes da chegada do cliente.");
         }
     }
 
+    public long customerId() {
+        return customer.id();
+    }
+
+    public LocalDateTime arrivalTime() {
+        return customer.arrivalTime();
+    }
+
     public Duration calculateWaitTime() {
-        return Duration.between(arrivalTime, serviceStartedAt);
+        return Duration.between(customer.arrivalTime(), serviceStartedAt);
     }
 }

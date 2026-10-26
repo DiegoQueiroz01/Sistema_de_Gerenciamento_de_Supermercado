@@ -45,6 +45,7 @@
 │   │   │   ├── CliApplication.java
 │   │   │   ├── InputReader.java
 │   │   │   ├── MenuRouter.java
+│   │   │   ├── QueueMenu.java
 │   │   │   ├── StockistMenu.java
 │   │   │   └── TerminalOutput.java
 │   │   └── repositories/
@@ -89,10 +90,19 @@ menus:
   vendidos, caixas abertos, filas, atendimentos e tempo médio de espera.
 
 O `QueueService` e as entidades de caixa já implementam a abertura/fechamento,
-a distribuição de chegadas para a menor fila, a transferência manual para o
-final de outra fila e o registro do tempo entre chegada e início do atendimento.
+a distribuição de chegadas para a menor fila, a transferência manual para outra
+fila e o registro do tempo entre chegada e início do atendimento.
 Ao fechar um caixa com clientes aguardando, eles são redistribuídos para caixas
-abertos; se não houver destino, o fechamento é recusado.
+abertos; se não houver destino, o fechamento é recusado. Na transferência e na
+redistribuição, o cliente prioritário continua à frente dos comuns e, dentro de
+cada grupo, vale a ordem de chegada.
+
+Também há senha sequencial formatada (S001), nome do cliente, capacidade máxima
+por fila, cliente em atendimento (chamar o próximo conclui o atendimento anterior),
+histórico por caixa e remoção de caixas fechados. O `DashboardService` reúne os
+indicadores de atendimento (caixas abertos, clientes aguardando, total atendido,
+espera média geral e por caixa, caixa com mais atendimentos e menor fila), e o
+`QueueMenu` oferece essas operações no terminal.
 
 ### Domínio
 
