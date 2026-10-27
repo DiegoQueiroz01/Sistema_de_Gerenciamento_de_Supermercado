@@ -28,11 +28,12 @@ mvn clean compile exec:java "-Dexec.args=--mysql"
 O Maven baixa o driver JDBC. O programa usa `jdbc:mysql://localhost:3306/mercado_facil` por padrão. Se necessário, defina `MERCADO_DB_URL`.
 
 ## 5. Persistência e histórico
-- Produtos e categorias são gravados no MySQL.
+- Produtos e categorias são gravados no MySQL. Produtos desativados ficam com `ativo = FALSE` e somem das consultas.
 - O estoque disponível é reconstruído somando entradas e subtraindo saídas do histórico.
 - Movimentações são preservadas; não apague diretamente produtos que tenham movimentações.
 - Sem `--mysql` o programa roda todo em memória, com dados de exemplo. A opção `--mysql` liga produtos e estoque ao banco.
-- A integração com vendas e o ranking de mais vendidos ainda dependem da fonte de vendas do módulo E.2; o histórico de entradas/saídas do estoque é persistido neste módulo.
+- Cada venda finalizada grava uma saída (`EXIT`) por produto em `movimentacoes_estoque`, então o saldo no banco já considera as vendas.
+- As vendas em si (cupons), os usuários, os caixas e as filas ficam em memória e são perdidos ao encerrar o programa. Por isso o ranking de mais vendidos considera apenas as vendas da sessão.
 
 ## Observação
 O esquema usa `ENTRY` e `EXIT` porque esses são os valores do enum `MovementType` no código existente. Os nomes das tabelas e colunas estão em português.

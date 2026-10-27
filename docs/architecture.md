@@ -3,160 +3,151 @@
 ## Diretrizes
 
 - Aplicação Java 17, organizada como projeto Maven.
-- Uso pelo terminal; não há telas gráficas, navegador ou frontend.
+- Uso exclusivamente pelo terminal; não há telas gráficas, navegador ou frontend.
 - Separação entre apresentação, casos de uso, domínio, contratos de dados e
   infraestrutura.
+- Os dados ficam em estruturas de dados em memória. O MySQL é opcional e cobre
+  apenas produtos, categorias e movimentações de estoque.
 
 ## Estrutura
 
 ```text
 .
-├── docs/
-│   └── architecture.md
-├── src/
-│   ├── main/java/br/com/supermercado/
-│   │   ├── Main.java
-│   │   ├── application/
-│   │   │   ├── auth/AuthService.java
-│   │   │   ├── checkout/QueueService.java
-│   │   │   ├── inventory/InventoryService.java
-│   │   │   ├── product/ProductService.java
-│   │   │   ├── reporting/DashboardService.java
-│   │   │   ├── sales/SaleService.java
-│   │   │   └── store/SupermarketService.java
-│   │   ├── domain/
-│   │   │   ├── checkout/{AttendanceQueue, Checkout, CheckoutStatus, Customer, ServiceRecord}.java
-│   │   │   ├── inventory/{MovementType, StockMovement}.java
-│   │   │   ├── product/{Category, Product}.java
-│   │   │   ├── sales/{Sale, SaleItem}.java
-│   │   │   ├── store/Supermarket.java
-│   │   │   └── user/{User, UserRole}.java
-│   │   ├── infrastructure/memory/
-│   │   │   ├── InMemoryCheckoutRepository.java
-│   │   │   ├── InMemoryProductRepository.java
-│   │   │   ├── InMemorySaleRepository.java
-│   │   │   ├── InMemoryServiceRecordRepository.java
-│   │   │   ├── InMemoryStockMovementRepository.java
-│   │   │   ├── InMemorySupermarketRepository.java
-│   │   │   └── InMemoryUserRepository.java
-│   │   ├── presentation/cli/
-│   │   │   ├── AdminMenu.java
-│   │   │   ├── CashierMenu.java
-│   │   │   ├── CliApplication.java
-│   │   │   ├── InputReader.java
-│   │   │   ├── MenuRouter.java
-│   │   │   ├── QueueMenu.java
-│   │   │   ├── StockistMenu.java
-│   │   │   └── TerminalOutput.java
-│   │   └── repositories/
-│   │       ├── CheckoutRepository.java
-│   │       ├── ProductRepository.java
-│   │       ├── SaleRepository.java
-│   │       ├── ServiceRecordRepository.java
-│   │       ├── StockMovementRepository.java
-│   │       ├── SupermarketRepository.java
-│   │       └── UserRepository.java
-├── .gitignore
-├── pom.xml
-└── README.md
+├── docs/architecture.md
+├── sql/                         scripts do MySQL (opcional)
+├── src/main/java/br/com/supermercado/
+│   ├── Main.java                ponto de entrada (memória ou --mysql)
+│   ├── AppServices.java         liga serviços e repositórios
+│   ├── DemoData.java            dados iniciais (produtos, usuários, caixas)
+│   ├── application/
+│   │   ├── auth/AuthService.java
+│   │   ├── checkout/QueueService.java
+│   │   ├── inventory/InventoryService.java
+│   │   ├── product/ProductService.java
+│   │   ├── reporting/DashboardService.java
+│   │   ├── sales/{Cart, SaleService}.java
+│   │   └── store/SupermarketService.java
+│   ├── domain/
+│   │   ├── checkout/{AttendanceQueue, Checkout, CheckoutStatus, Customer, ServiceRecord}.java
+│   │   ├── inventory/{MovementType, StockMovement}.java
+│   │   ├── product/{Category, Product}.java
+│   │   ├── sales/{Sale, SaleItem}.java
+│   │   ├── store/Supermarket.java
+│   │   └── user/{User, UserRole}.java
+│   ├── repositories/            contratos de acesso aos dados
+│   ├── infrastructure/
+│   │   ├── memory/              implementações em memória (estruturas de dados)
+│   │   └── mysql/               produtos e estoque no MySQL
+│   └── presentation/cli/
+│       ├── CliApplication.java  tela inicial e login
+│       ├── MenuRouter.java      abre o menu do perfil
+│       ├── AdminMenu.java, UserAdminMenu.java
+│       ├── StockistMenu.java, ProductAdminMenu.java, StockMenuBase.java
+│       ├── CashierMenu.java, SaleViews.java
+│       ├── QueueMenu.java
+│       ├── ProductSelector.java
+│       └── InputReader.java, TerminalOutput.java
+└── src/test/java/br/com/supermercado/
+    ├── E1Tests, E2Tests, SalesTests, UserTests, StoreTests, AdminTests
+    ├── SuiteTest.java           executa todas as suítes no "mvn test"
+    └── E1Demo, E2Demo           demonstrações isoladas dos módulos
 ```
 
 ## Responsabilidades
 
-### Apresentação CLI
+### Apresentação (terminal)
 
-`Main` inicia a aplicação; `CliApplication` controla o ciclo de interação.
-`MenuRouter` direciona o usuário autenticado ao menu correspondente ao seu
-perfil. Os menus de administrador, estoquista e operador de caixa recebem
-comandos em texto. `InputReader` e `TerminalOutput` concentram, respectivamente,
-a leitura e a apresentação no terminal.
+`Main` escolhe o armazenamento, carrega os dados iniciais e inicia a
+`CliApplication`, que mostra a tela inicial e faz o login (até 3 tentativas).
+O `MenuRouter` abre o menu do perfil do usuário; ao sair dele, a sessão é
+encerrada e o programa volta para a tela inicial.
+
+- **Administrador** (`AdminMenu`): visão geral, produtos/categorias/estoque,
+  caixas e filas, relatórios de vendas, usuários, dados do supermercado,
+  parâmetros e troca de senha.
+- **Estoquista** (`StockistMenu`): consultas de produtos, entradas e saídas de
+  estoque, alertas, itens parados, histórico e troca de senha.
+- **Operador de caixa** (`CashierMenu` + `QueueMenu`): vendas (carrinho, cupom,
+  vendas do dia), operação de caixas e filas e troca de senha.
+
+`InputReader` concentra a leitura validada (números, decimais, datas, s/n,
+menus) e `TerminalOutput` a escrita e a formatação (moeda, datas, tabelas).
 
 ### Aplicação
 
-Os serviços coordenam ações e validações dos casos de uso sem depender dos
-menus:
-
-- `AuthService`: autenticação e consulta do perfil autorizado.
-- `ProductService`: cadastro sem código duplicado, pesquisa, edição, filtro e
-  ordenação de produtos.
-- `SupermarketService`: dados cadastrais do estabelecimento.
-- `InventoryService`: entrada/saída, consulta do histórico, alertas de estoque
-  mínimo e identificação de itens sem movimentação.
-- `SaleService`: composição de vendas e itens; ao concluir uma venda, solicita a
-  baixa de estoque e o registro da movimentação correspondente.
-- `QueueService`: abertura/fechamento de caixas, distribuição para a menor fila,
-  prioridade, transferência de clientes e conclusão do atendimento.
-- `DashboardService`: métricas de estoque e atendimento, incluindo mais
-  vendidos, caixas abertos, filas, atendimentos e tempo médio de espera.
-
-O `QueueService` e as entidades de caixa já implementam a abertura/fechamento,
-a distribuição de chegadas para a menor fila, a transferência manual para outra
-fila e o registro do tempo entre chegada e início do atendimento.
-Ao fechar um caixa com clientes aguardando, eles são redistribuídos para caixas
-abertos; se não houver destino, o fechamento é recusado. Na transferência e na
-redistribuição, o cliente prioritário continua à frente dos comuns e, dentro de
-cada grupo, vale a ordem de chegada.
-
-Também há senha sequencial formatada (S001), nome do cliente, capacidade máxima
-por fila, cliente em atendimento (chamar o próximo conclui o atendimento anterior),
-histórico por caixa e remoção de caixas fechados. O `DashboardService` reúne os
-indicadores de atendimento (caixas abertos, clientes aguardando, total atendido,
-espera média geral e por caixa, caixa com mais atendimentos e menor fila), e o
-`QueueMenu` oferece essas operações no terminal.
+- `AuthService`: login, cadastro e edição de usuários, troca/redefinição de
+  senha, ativação e desativação.
+- `SupermarketService`: dados cadastrais do estabelecimento e cabeçalho do cupom.
+- `ProductService`: cadastro sem código duplicado, pesquisa, edição, filtro,
+  ordenação, categorias e desativação de produtos.
+- `InventoryService`: entradas e saídas, histórico, alertas de estoque mínimo,
+  itens sem movimentação, ranking de mais vendidos e baixa de estoque das vendas.
+- `SaleService` e `Cart`: montagem da venda, finalização, consultas e resumo.
+- `QueueService`: caixas, chegada de clientes, menor fila, prioridade,
+  transferência, atendimento, fechamento com redistribuição e capacidade das filas.
+- `DashboardService`: indicadores de atendimento e visão geral do supermercado.
 
 ### Domínio
 
-Os modelos representam o supermercado; usuários e seus perfis; produtos e
-categorias; entradas e saídas de estoque; vendas e itens; caixas, filas, clientes
-em espera e registros de atendimento. `MovementType` distingue entrada de
-saída, `CheckoutStatus` representa o estado de um caixa e `UserRole` representa
-administrador, estoquista e operador de caixa.
+Os modelos representam o supermercado, os usuários e seus perfis, produtos e
+categorias, movimentações de estoque, vendas e itens, caixas, filas, clientes em
+espera e registros de atendimento. `MovementType` distingue entrada de saída,
+`CheckoutStatus` o estado de um caixa e `UserRole` o perfil de acesso.
 
 ### Dados e estruturas
 
-As interfaces em `repositories` definem as operações de armazenamento. As
-implementações em `infrastructure/memory` manterão os dados em memória. A
-estrutura prevista segue os relatórios:
+As interfaces em `repositories` definem as operações de armazenamento; as
+implementações em `infrastructure/memory` usam:
 
-- mapa por código para pesquisa rápida e prevenção de produtos duplicados;
-- coleções de produtos, movimentações, vendas e registros para listagem,
-  filtragem, ordenação e histórico;
-- uma fila por caixa, mantendo FIFO para clientes comuns e inserção prioritária
-  no início;
-- coleção de caixas para localizar a menor fila e consolidar métricas.
+| Repositório / classe | Estrutura |
+|----------------------|-----------|
+| `InMemoryProductRepository` | mapa por código + mapa de desativados + lista de categorias |
+| `InMemoryUserRepository` | mapa por login |
+| `InMemoryCheckoutRepository` | mapa por número do caixa, na ordem de criação |
+| `AttendanceQueue` (fila de cada caixa) | lista encadeada: FIFO e inserção prioritária |
+| `InMemoryStockMovementRepository` | lista em ordem de registro |
+| `InMemorySaleRepository` | lista em ordem de registro + mapa por número da venda |
+| `InMemoryServiceRecordRepository` | lista em ordem de registro + mapa por caixa |
+| `Cart` | mapa ordenado por código + pilha de inclusões (desfazer) |
 
-O armazenamento de dados e as estruturas concretas ainda serão implementados.
+Com `--mysql`, `MySQLProductRepository` e `MySQLStockMovementRepository`
+substituem os repositórios de produtos e movimentações; o saldo de cada produto
+é recalculado somando entradas e subtraindo saídas do histórico.
 
 ## Regras contempladas
 
 ### Produtos e estoque
 
-- Código de produto único; busca por código/nome e filtro por categoria.
+- Código de produto único; busca por código/nome (sem diferenciar acentos e
+  maiúsculas) e filtro por categoria.
 - Edição de dados cadastrais e listagem por nome, preço ou quantidade.
-- Entradas e saídas registradas com data, produto, quantidade e tipo.
+- Quantidade só muda por movimentações; entradas e saídas registradas com data,
+  produto, quantidade, tipo e responsável (usuário logado).
 - Saída não pode ultrapassar o estoque disponível.
 - Produtos abaixo do mínimo ou sem movimentação ficam consultáveis.
-- Relatório de mais vendidos baseado nos itens das vendas.
+- Produto só é desativado com estoque zerado; o histórico é mantido.
 
 ### Vendas
 
-Cada venda agrupa um ou mais itens. Sua finalização atualiza o estoque e registra
-uma saída para cada produto, mantendo o histórico consistente.
+- O carrinho confere o estoque a cada item e permite desfazer o último item.
+- A finalização é tudo ou nada: baixa o estoque de todos os itens (uma saída por
+  produto) e grava a venda; se faltar estoque em algum item, nada muda.
+- O cupom guarda nome e preço do momento da venda e, se houver, o caixa e a
+  senha do cliente em atendimento.
+- O ranking de mais vendidos é calculado a partir dos itens das vendas.
 
 ### Caixas e filas
 
-- Senha/identificador sequencial e horário de chegada para cada cliente.
-- Direcionamento padrão à menor fila disponível.
+- Senha sequencial (S001) e horário de chegada para cada cliente.
+- Direcionamento padrão à menor fila aberta com espaço; capacidade máxima por fila.
 - Atendimento FIFO para clientes comuns e precedência para prioritários.
-- Cliente não deve estar em mais de uma fila ao mesmo tempo.
-- Fechar caixa com clientes pendentes exige transferi-los para caixas ativos.
-- Atendimento concluído gera registro com caixa e horários para cálculo da espera.
+- Cliente não fica em mais de uma fila ao mesmo tempo.
+- Fechar caixa com clientes aguardando os redistribui para caixas abertos; sem
+  destino ou sem espaço, o fechamento é recusado.
+- Cada atendimento gera um registro com caixa e horários para o cálculo da espera.
 
-## Fluxos de terminal previstos
+### Usuários
 
-- **Administrador:** visão geral, produtos, categorias, usuários, caixas,
-  parâmetros e relatórios.
-- **Estoquista:** consulta de produtos, entradas, alertas e histórico de estoque.
-- **Operador de caixa:** registro de venda e operação de atendimento/caixa.
-
-Os fluxos acima descrevem a navegação planejada.
+- Login único; senha guardada como hash SHA-256 com sal, nunca em texto.
+- Usuário desativado não entra; ninguém desativa a própria conta.
+- Sempre existe ao menos um administrador ativo.

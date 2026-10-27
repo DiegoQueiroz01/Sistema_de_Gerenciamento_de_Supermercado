@@ -5,11 +5,13 @@ relatórios de controle de produtos e estoque e de gerenciamento de filas e caix
 
 ## Escopo
 
-- Cadastro, pesquisa, edição, categorização e ordenação de produtos.
+- Cadastro, pesquisa, edição, categorização, ordenação e desativação de produtos.
 - Entradas e saídas de estoque com histórico e alertas de estoque mínimo.
-- Registro de vendas e consulta de produtos mais vendidos.
+- Registro de vendas com carrinho e cupom, baixa automática de estoque e ranking
+  de produtos mais vendidos.
 - Gerenciamento de caixas, filas comuns e prioritárias, atendimento e histórico.
-- Acesso organizado por perfil: administrador, estoquista e operador de caixa.
+- Login com perfis (administrador, estoquista e operador de caixa) e gestão de usuários.
+- Visão geral do supermercado, dados do estabelecimento e parâmetros.
 - Interface exclusivamente textual, sem frontend gráfico ou aplicação web.
 
 ## Arquitetura
@@ -23,10 +25,22 @@ O projeto segue uma separação em camadas:
 - `infrastructure/mysql`: armazenamento de produtos e estoque no MySQL.
 - `presentation/cli`: menus, leitura de comandos e apresentação no terminal.
 
-O armazenamento em memória segue as estruturas de dados dos relatórios: mapa por
-código para produtos, listas para consultas e históricos e filas para o
-atendimento. Produtos, categorias e movimentações de estoque também podem ser
-gravados no MySQL.
+## Estruturas de dados
+
+Por padrão todos os dados ficam em memória, nas estruturas abaixo:
+
+| Dado | Estrutura | Por quê |
+|------|-----------|---------|
+| Produtos | mapa por código (`LinkedHashMap`) | busca direta pelo código e bloqueio de código repetido |
+| Usuários | mapa por login | busca direta no login e bloqueio de login repetido |
+| Caixas | mapa por número, na ordem de criação | busca pelo número e percurso para achar a menor fila |
+| Fila de cada caixa | lista encadeada (`LinkedList`) | FIFO para comuns; prioritários inseridos à frente dos comuns |
+| Movimentações, vendas e atendimentos | listas em ordem de registro | histórico cronológico; atendimentos também indexados por caixa |
+| Carrinho da venda | mapa ordenado + pilha (`ArrayDeque`) | soma itens repetidos; "desfazer último item" em ordem inversa (LIFO) |
+
+Ordenações usam `Comparator` (nome, preço, quantidade, déficit, mais vendidos).
+Opcionalmente, produtos, categorias e movimentações de estoque podem ser gravados
+no MySQL (veja abaixo).
 
 Veja [docs/architecture.md](docs/architecture.md) para o detalhamento dos módulos,
 responsabilidades e regras contempladas.
@@ -72,16 +86,19 @@ mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E2Demo -Dexec.cl
 
 ### Testes
 
-Produtos e estoque:
+Todas as suítes de uma vez:
+
+```bash
+mvn test
+```
+
+Cada suíte também pode ser executada sozinha, trocando o nome da classe:
+`E1Tests` (produtos e estoque), `E2Tests` (caixas e filas), `SalesTests` (vendas),
+`UserTests` (usuários e login), `StoreTests` (dados do supermercado) e
+`AdminTests` (saídas, desativação, visão geral e parâmetros).
 
 ```bash
 mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E1Tests -Dexec.classpathScope=test
-```
-
-Caixas e filas:
-
-```bash
-mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E2Tests -Dexec.classpathScope=test
 ```
 
 O resultado aparece no final, por exemplo: `Resultado: 37 passaram, 0 falharam.`
