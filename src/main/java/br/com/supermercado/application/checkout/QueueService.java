@@ -23,7 +23,7 @@ import java.util.Optional;
 public final class QueueService {
     private final CheckoutRepository checkoutRepository;
     private final ServiceRecordRepository recordRepository;
-    private final int queueCapacity;
+    private int queueCapacity;
     private long nextCustomerId = 1;
     private int nextCheckoutNumber = 1;
 
@@ -43,6 +43,19 @@ public final class QueueService {
         this.checkoutRepository = Objects.requireNonNull(checkoutRepository);
         this.recordRepository = Objects.requireNonNull(recordRepository);
         this.queueCapacity = queueCapacity;
+    }
+
+    /** Capacidade máxima de fila usada nos caixas criados a partir de agora. */
+    public int queueCapacity() {
+        return queueCapacity;
+    }
+
+    /** Parâmetro do administrador: vale para os caixas criados depois da alteração. */
+    public void changeQueueCapacity(int capacity) {
+        if (capacity < 1) {
+            throw new IllegalArgumentException("A capacidade da fila deve ser positiva.");
+        }
+        this.queueCapacity = capacity;
     }
 
     /** Cria um caixa fechado com o próximo número livre ("1", "2", ...). */

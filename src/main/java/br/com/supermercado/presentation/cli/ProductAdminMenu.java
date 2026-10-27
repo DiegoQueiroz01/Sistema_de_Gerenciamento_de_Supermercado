@@ -8,8 +8,8 @@ import br.com.supermercado.domain.product.Product;
 import java.time.LocalDateTime;
 
 /**
- * Parte do menu do ADMINISTRADOR que pertence ao E.1: produtos, categorias e relatórios de estoque.
- * O AdminMenu apenas chama {@link #run()} em uma de suas opções.
+ * Parte do menu do ADMINISTRADOR: produtos, categorias, movimentações e relatórios de estoque.
+ * O AdminMenu chama {@link #run()} em uma de suas opções.
  */
 public final class ProductAdminMenu extends StockMenuBase {
 
@@ -37,7 +37,7 @@ public final class ProductAdminMenu extends StockMenuBase {
         do {
             option = readMenuOption("PRODUTOS", "Cadastrar produto", "Editar produto",
                     "Definir estoque mínimo", "Pesquisar por código ou nome", "Filtrar por categoria",
-                    "Listar ordenado", "Listar todos");
+                    "Listar ordenado", "Listar todos", "Desativar produto");
             try {
                 switch (option) {
                     case 1 -> registerProduct();
@@ -47,6 +47,7 @@ public final class ProductAdminMenu extends StockMenuBase {
                     case 5 -> filterByCategory();
                     case 6 -> listSorted();
                     case 7 -> listAll();
+                    case 8 -> deactivateProduct();
                     default -> { }
                 }
             } catch (IllegalArgumentException | IllegalStateException e) {
@@ -58,14 +59,17 @@ public final class ProductAdminMenu extends StockMenuBase {
     private void reportsMenu() {
         int option;
         do {
-            option = readMenuOption("ESTOQUE E RELATÓRIOS", "Produtos abaixo do estoque mínimo",
+            option = readMenuOption("ESTOQUE E RELATÓRIOS", "Registrar entrada de estoque",
+                    "Registrar saída (perda, avaria, consumo)", "Produtos abaixo do estoque mínimo",
                     "Produtos sem movimentação", "Produtos mais vendidos", "Histórico de movimentações");
             try {
                 switch (option) {
-                    case 1 -> belowMinimum();
-                    case 2 -> withoutMovement();
-                    case 3 -> topSelling();
-                    case 4 -> history();
+                    case 1 -> registerEntry();
+                    case 2 -> registerExit();
+                    case 3 -> belowMinimum();
+                    case 4 -> withoutMovement();
+                    case 5 -> topSelling();
+                    case 6 -> history();
                     default -> { }
                 }
             } catch (IllegalArgumentException | IllegalStateException e) {
@@ -139,6 +143,20 @@ public final class ProductAdminMenu extends StockMenuBase {
         products.edit(p.code(), name, category, price, minimum);
         success("Produto atualizado. (A quantidade só muda por movimentações.)");
         warnIfBelowMinimum(products.requireByCode(p.code()));
+    }
+
+    private void deactivateProduct() {
+        title("Desativar Produto");
+        Product p = selectProduct();
+        if (p == null) return;
+        println("  O produto sai das consultas e das vendas; o histórico é mantido.");
+        println("  Para reativar, cadastre de novo o mesmo código.");
+        if (!confirm("Desativar '" + p.name() + "'?")) {
+            warning("Operação cancelada.");
+            return;
+        }
+        products.deactivate(p.code());
+        success("Produto desativado: " + p.name());
     }
 
     private void defineMinimumStock() {

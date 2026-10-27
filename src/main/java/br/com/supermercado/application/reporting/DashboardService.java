@@ -1,11 +1,18 @@
 package br.com.supermercado.application.reporting;
 
 import br.com.supermercado.application.checkout.QueueService;
+import br.com.supermercado.application.inventory.InventoryService;
+import br.com.supermercado.application.inventory.InventoryService.TopSellingProduct;
+import br.com.supermercado.application.product.ProductService;
+import br.com.supermercado.application.sales.SaleService;
+import br.com.supermercado.application.sales.SaleService.SalesSummary;
 import br.com.supermercado.domain.checkout.Checkout;
 import br.com.supermercado.domain.checkout.Customer;
 import br.com.supermercado.domain.checkout.ServiceRecord;
+import br.com.supermercado.domain.product.Product;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -14,13 +21,50 @@ import java.util.Optional;
 /**
  * Indicadores de atendimento: caixas abertos, clientes aguardando, total atendido,
  * espera média (geral e por caixa), caixa com mais atendimentos e menor fila.
- * As métricas de estoque (mais vendidos) ficam no InventoryService.
+ * Com os serviços de produtos, estoque e vendas, também monta a visão geral do
+ * administrador (estoque, vendas do dia, mais vendidos e atendimento).
  */
 public final class DashboardService {
-    private final QueueService queues;
+    private static final int TOP_SELLING_IN_OVERVIEW = 3;
 
+    private final QueueService queues;
+    private final ProductService products;
+    private final InventoryService inventory;
+    private final SaleService sales;
+
+    /** Apenas indicadores de atendimento. */
     public DashboardService(QueueService queues) {
+        this(queues, null, null, null);
+    }
+
+    public DashboardService(QueueService queues, ProductService products, InventoryService inventory,
+                            SaleService sales) {
         this.queues = Objects.requireNonNull(queues, "O serviço de filas é obrigatório.");
+        this.products = products;
+        this.inventory = inventory;
+        this.sales = sales;
+    }
+
+    /** Visão geral do supermercado na data informada. */
+    public StoreOverview storeOverview(LocalDate date) {
+        if (products == null || inventory == null || sales == null) {
+            throw new IllegalStateException("Visão geral indisponível: faltam os serviços de produtos, estoque e vendas.");
+        }
+        int outOfStock = 0;
+        double stockValue = 0;
+        List<Product> all = products.listAll();
+        for (Product p : all) {
+            if (p.quantity() == 0) outOfStock++;
+            stockValue += p.quantity() * p.price();
+        }
+        return new StoreOverview(
+                all.size(),
+                inventory.listBelowMinimum().size(),
+                outOfStock,
+                stockValue,
+                sales.summarize(sales.listByDate(date)),
+                inventory.topSelling(TOP_SELLING_IN_OVERVIEW),
+                queueOverview());
     }
 
     public QueueOverview queueOverview() {
@@ -77,6 +121,16 @@ public final class DashboardService {
             Optional<String> busiestCheckoutId,
             Optional<String> shortestQueueCheckoutId,
             List<CheckoutSummary> checkouts) {
+    }
+
+    public record StoreOverview(
+            int activeProducts,
+            int belowMinimum,
+            int outOfStock,
+            double stockValue,
+            SalesSummary salesOfDay,
+            List<TopSellingProduct> topSelling,
+            QueueOverview queues) {
     }
 
     public record CheckoutSummary(

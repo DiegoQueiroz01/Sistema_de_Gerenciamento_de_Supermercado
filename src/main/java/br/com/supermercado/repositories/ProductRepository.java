@@ -15,6 +15,12 @@ public interface ProductRepository {
 
     List<Product> findAll();
 
+    /**
+     * Tira o produto das consultas sem apagar o histórico. Cadastrar de novo o mesmo
+     * código reativa o produto.
+     */
+    void deactivate(String code);
+
     void saveCategory(Category category);
 
     List<Category> findAllCategories();

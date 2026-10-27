@@ -149,6 +149,47 @@ abstract class StockMenuBase {
         return selector.select("Código ou nome do produto: ");
     }
 
+    protected void registerEntry() {
+        title("Registrar Entrada de Estoque");
+        Product p = selectProduct();
+        if (p == null) return;
+        println("  Saldo atual de '" + p.name() + "': " + p.quantity() + " un");
+        int quantity = readInt("Quantidade recebida (1 a 1000000): ", 1, 1_000_000);
+        println("  Novo saldo previsto: " + (p.quantity() + quantity) + " un");
+        if (!confirm("Confirmar entrada?")) {
+            warning("Operação cancelada.");
+            return;
+        }
+        inventory.registerEntry(p.code(), quantity, responsible);
+        // Relê o produto: com MySQL cada consulta devolve uma cópia nova.
+        Product updated = products.requireByCode(p.code());
+        success("Entrada registrada. Saldo atual: " + updated.quantity() + " un");
+        warnIfBelowMinimum(updated);
+    }
+
+    /** Saída manual (perda, avaria, vencimento, consumo interno). Vendas usam o menu do caixa. */
+    protected void registerExit() {
+        title("Registrar Saída de Estoque");
+        println("  Use para perdas, avarias, vencimentos e consumo interno. Vendas são registradas no caixa.");
+        Product p = selectProduct();
+        if (p == null) return;
+        if (p.quantity() == 0) {
+            error("'" + p.name() + "' está sem estoque.");
+            return;
+        }
+        println("  Saldo atual de '" + p.name() + "': " + p.quantity() + " un");
+        int quantity = readInt("Quantidade que sai (1 a " + p.quantity() + "): ", 1, p.quantity());
+        println("  Novo saldo previsto: " + (p.quantity() - quantity) + " un");
+        if (!confirm("Confirmar saída?")) {
+            warning("Operação cancelada.");
+            return;
+        }
+        inventory.registerExit(p.code(), quantity, responsible);
+        Product updated = products.requireByCode(p.code());
+        success("Saída registrada. Saldo atual: " + updated.quantity() + " un");
+        warnIfBelowMinimum(updated);
+    }
+
     protected void warnIfBelowMinimum(Product p) {
         if (p.isBelowMinimum()) {
             warning("ALERTA: '" + p.name() + "' está abaixo do estoque mínimo ("

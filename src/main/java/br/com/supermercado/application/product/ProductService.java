@@ -129,6 +129,21 @@ public final class ProductService {
         products.save(product);
     }
 
+    /**
+     * Desativa o produto: ele sai das consultas e não pode mais ser vendido, mas o histórico
+     * de movimentações e vendas é mantido. Só é permitido com estoque zerado, para que nenhum
+     * saldo "suma" sem uma saída registrada.
+     */
+    public Product deactivate(String code) {
+        Product product = requireByCode(code);
+        if (product.quantity() > 0) {
+            throw new IllegalStateException("Zere o estoque de '" + product.name()
+                    + "' com uma saída antes de desativá-lo (saldo atual: " + product.quantity() + ").");
+        }
+        products.deactivate(product.code());
+        return product;
+    }
+
     public void defineMinimumStock(String code, int minimumStock) {
         Product p = requireByCode(code);
         p.edit(p.name(), p.category(), p.price(), minimumStock);

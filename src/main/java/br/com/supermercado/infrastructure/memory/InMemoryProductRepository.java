@@ -10,14 +10,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Mapa por código (busca O(1) e prevenção de duplicados) + lista de categorias. */
+/**
+ * Mapa por código (busca O(1) e prevenção de duplicados) + lista de categorias.
+ * Produtos desativados saem do mapa principal e vão para um mapa à parte.
+ */
 public final class InMemoryProductRepository implements ProductRepository {
     private final Map<String, Product> productsByCode = new LinkedHashMap<>();
+    private final Map<String, Product> inactiveByCode = new LinkedHashMap<>();
     private final List<Category> categories = new ArrayList<>();
 
     @Override
     public void save(Product product) {
+        inactiveByCode.remove(product.code());
         productsByCode.put(product.code(), product);
+    }
+
+    @Override
+    public void deactivate(String code) {
+        Product removed = code == null ? null : productsByCode.remove(code.trim());
+        if (removed != null) {
+            inactiveByCode.put(removed.code(), removed);
+        }
     }
 
     @Override

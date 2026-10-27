@@ -56,6 +56,6 @@ public record AppServices(
                 inventory,
                 sales,
                 queues,
-                new DashboardService(queues));
+                new DashboardService(queues, products, inventory, sales));
     }
 }

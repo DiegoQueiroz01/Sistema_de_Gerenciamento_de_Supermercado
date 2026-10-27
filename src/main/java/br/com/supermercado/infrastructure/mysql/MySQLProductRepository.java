@@ -22,6 +22,7 @@ public final class MySQLProductRepository implements ProductRepository {
         try(Connection c=ConexaoMySQL.abrir(); PreparedStatement s=c.prepareStatement(sql)){s.setString(1,code.trim());try(ResultSet r=s.executeQuery()){return r.next()?Optional.of(mapear(r)):Optional.empty();}}catch(SQLException e){throw erro("consultar produto",e);}
     }
     @Override public boolean existsByCode(String code){return findByCode(code).isPresent();}
+    @Override public void deactivate(String code){try(Connection c=ConexaoMySQL.abrir();PreparedStatement s=c.prepareStatement("UPDATE produtos SET ativo=FALSE WHERE codigo=?")){s.setString(1,code.trim());s.executeUpdate();}catch(SQLException e){throw erro("desativar produto",e);}}
     @Override public List<Product> findAll(){
         String sql="SELECT p.codigo,p.nome,p.categoria_nome,p.preco,p.estoque_minimo,p.data_cadastro, COALESCE(SUM(CASE WHEN m.tipo='ENTRY' THEN m.quantidade WHEN m.tipo='EXIT' THEN -m.quantidade ELSE 0 END),0) quantidade FROM produtos p LEFT JOIN movimentacoes_estoque m ON m.codigo_produto=p.codigo WHERE p.ativo=TRUE GROUP BY p.codigo,p.nome,p.categoria_nome,p.preco,p.estoque_minimo,p.data_cadastro ORDER BY p.nome";
         List<Product> out=new ArrayList<>();try(Connection c=ConexaoMySQL.abrir();PreparedStatement s=c.prepareStatement(sql);ResultSet r=s.executeQuery()){while(r.next())out.add(mapear(r));return out;}catch(SQLException e){throw erro("listar produtos",e);}
