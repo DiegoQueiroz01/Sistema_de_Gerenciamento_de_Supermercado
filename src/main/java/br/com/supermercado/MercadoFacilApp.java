@@ -4,15 +4,19 @@ import br.com.supermercado.application.checkout.QueueService;
 import br.com.supermercado.application.inventory.InventoryService;
 import br.com.supermercado.application.product.ProductService;
 import br.com.supermercado.application.reporting.DashboardService;
+import br.com.supermercado.application.sales.SaleService;
+import br.com.supermercado.infrastructure.memory.InMemorySaleRepository;
 import br.com.supermercado.infrastructure.mysql.ConexaoMySQL;
 import br.com.supermercado.infrastructure.mysql.MySQLProductRepository;
 import br.com.supermercado.infrastructure.mysql.MySQLStockMovementRepository;
+import br.com.supermercado.presentation.cli.CashierMenu;
+import br.com.supermercado.presentation.cli.InputReader;
 import br.com.supermercado.presentation.cli.ProductAdminMenu;
 import br.com.supermercado.presentation.cli.QueueMenu;
 import br.com.supermercado.presentation.cli.StockistMenu;
+import br.com.supermercado.presentation.cli.TerminalOutput;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.Scanner;
 
 /** Aplicação persistente do Mercado Fácil. */
@@ -24,11 +28,17 @@ public final class MercadoFacilApp {
       var repositorioProdutos = new MySQLProductRepository();
       var repositorioMovimentacoes = new MySQLStockMovementRepository();
       ProductService produtos = new ProductService(repositorioProdutos);
-      InventoryService estoque = new InventoryService(repositorioProdutos, repositorioMovimentacoes, List::of);
+      // Vendas ficam em memória durante a sessão; o ranking de mais vendidos lê delas.
+      var repositorioVendas = new InMemorySaleRepository();
+      InventoryService estoque = new InventoryService(repositorioProdutos, repositorioMovimentacoes,
+          SaleService.salesSource(repositorioVendas));
+      SaleService vendas = new SaleService(repositorioVendas, produtos, estoque);
       // Caixas e filas ficam em memória durante a sessão.
       QueueService filas = new QueueService();
       for (int i = 0; i < CAIXAS_INICIAIS; i++) filas.createCheckout();
       DashboardService painel = new DashboardService(filas);
+      TerminalOutput saida = new TerminalOutput(System.out);
+      InputReader leitor = new InputReader(scanner, saida);
       System.out.println("MERCADO FÁCIL — conectado ao MySQL");
       int opcao;
       do {
@@ -36,6 +46,7 @@ public final class MercadoFacilApp {
         System.out.println("1) Estoquista");
         System.out.println("2) Administrador — produtos e estoque");
         System.out.println("3) Caixas e filas");
+        System.out.println("4) Operador de caixa — vendas");
         System.out.println("0) Sair");
         System.out.print("Escolha: ");
         String entrada = scanner.nextLine().trim();
@@ -43,6 +54,7 @@ public final class MercadoFacilApp {
         if (opcao == 1) new StockistMenu(scanner, System.out, produtos, estoque, "Estoquista").run();
         else if (opcao == 2) new ProductAdminMenu(scanner, System.out, produtos, estoque, "Administrador").run();
         else if (opcao == 3) new QueueMenu(scanner, System.out, filas, painel).run();
+        else if (opcao == 4) new CashierMenu(leitor, saida, vendas, produtos, filas, "Operador de caixa").run();
         else if (opcao != 0) System.out.println("Opção inválida.");
       } while (opcao != 0);
       System.out.println("Sessão encerrada. Os dados permanecem no MySQL.");
