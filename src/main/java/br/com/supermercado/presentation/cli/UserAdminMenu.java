@@ -6,8 +6,8 @@ import br.com.supermercado.domain.user.UserRole;
 
 import java.util.List;
 
-/** Gestão de usuários pelo administrador e troca da própria senha (todos os perfis). */
-public final class UserAdminMenu {
+// Cadastro de usuários (só o administrador) e troca da própria senha (todos os perfis)
+public class UserAdminMenu {
     private final InputReader in;
     private final TerminalOutput out;
     private final AuthService auth;
@@ -27,19 +27,26 @@ public final class UserAdminMenu {
                     "Editar nome ou perfil", "Redefinir senha", "Desativar usuário", "Reativar usuário");
             try {
                 switch (option) {
-                    case 1 -> list();
-                    case 2 -> register();
-                    case 3 -> edit();
-                    case 4 -> resetPassword();
-                    case 5 -> {
+                    case 1:
+                        list();
+                        break;
+                    case 2:
+                        register();
+                        break;
+                    case 3:
+                        edit();
+                        break;
+                    case 4:
+                        resetPassword();
+                        break;
+                    case 5:
                         auth.deactivate(currentUser.username(), in.readRequired("Login do usuário: "));
                         out.success("Usuário desativado.");
-                    }
-                    case 6 -> {
+                        break;
+                    case 6:
                         auth.activate(in.readRequired("Login do usuário: "));
                         out.success("Usuário reativado.");
-                    }
-                    default -> { }
+                        break;
                 }
             } catch (IllegalArgumentException | IllegalStateException e) {
                 out.error(e.getMessage());
@@ -47,13 +54,15 @@ public final class UserAdminMenu {
         } while (option != 0);
     }
 
-    /** Troca da própria senha; usada pelos menus de todos os perfis. */
+    // Usado no menu de todos os perfis
     public static void changeOwnPassword(InputReader in, TerminalOutput out, AuthService auth, User user) {
         out.title("Alterar Minha Senha");
         try {
             String current = in.readRequired("Senha atual: ");
             String password = readNewPassword(in, out);
-            if (password == null) return;
+            if (password == null) {
+                return;
+            }
             auth.changePassword(user.username(), current, password);
             out.success("Senha alterada.");
         } catch (IllegalArgumentException | IllegalStateException e) {
@@ -80,36 +89,50 @@ public final class UserAdminMenu {
         String username = in.readRequired("Login (3 a 20 caracteres: a-z, 0-9, '.', '_'): ");
         String name = in.readRequired("Nome completo: ");
         UserRole role = chooseRole();
-        if (role == null) return;
+        if (role == null) {
+            return;
+        }
         String password = readNewPassword(in, out);
-        if (password == null) return;
+        if (password == null) {
+            return;
+        }
         User user = auth.register(username, name, password, role);
         out.success("Usuário '" + user.username() + "' cadastrado como " + role.label() + ".");
     }
 
     private void edit() {
         out.title("Editar Usuário");
-        User user = auth.findByUsername(in.readRequired("Login do usuário: "))
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado."));
+        User user = auth.findByUsername(in.readRequired("Login do usuário: "));
+        if (user == null) {
+            out.error("Usuário não encontrado.");
+            return;
+        }
         String name = in.readLine("Nome [" + user.name() + "]: ");
         UserRole role = user.role();
         if (in.confirm("Alterar o perfil (atual: " + role.label() + ")?")) {
             UserRole chosen = chooseRole();
-            if (chosen != null) role = chosen;
+            if (chosen != null) {
+                role = chosen;
+            }
         }
-        auth.edit(user.username(), name.isEmpty() ? user.name() : name, role);
+        if (name.isEmpty()) {
+            name = user.name();
+        }
+        auth.edit(user.username(), name, role);
         out.success("Usuário atualizado.");
     }
 
     private void resetPassword() {
         out.title("Redefinir Senha");
         String username = in.readRequired("Login do usuário: ");
-        if (auth.findByUsername(username).isEmpty()) {
+        if (auth.findByUsername(username) == null) {
             out.error("Usuário não encontrado.");
             return;
         }
         String password = readNewPassword(in, out);
-        if (password == null) return;
+        if (password == null) {
+            return;
+        }
         auth.resetPassword(username, password);
         out.success("Senha redefinida.");
     }
@@ -121,10 +144,13 @@ public final class UserAdminMenu {
         }
         out.println("  0) Cancelar");
         int n = in.readInt("Perfil: ", 0, roles.length);
-        return n == 0 ? null : roles[n - 1];
+        if (n == 0) {
+            return null;
+        }
+        return roles[n - 1];
     }
 
-    /** Pede a nova senha duas vezes; devolve null se não conferir. */
+    // Pede a senha nova duas vezes. Devolve null se não conferir.
     private static String readNewPassword(InputReader in, TerminalOutput out) {
         String password = in.readRequired("Nova senha (mínimo " + User.MIN_PASSWORD_LENGTH + " caracteres): ");
         if (password.length() < User.MIN_PASSWORD_LENGTH) {

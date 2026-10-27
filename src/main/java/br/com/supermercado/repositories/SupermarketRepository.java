@@ -2,11 +2,10 @@ package br.com.supermercado.repositories;
 
 import br.com.supermercado.domain.store.Supermarket;
 
-import java.util.Optional;
-
-/** Guarda os dados do único estabelecimento gerenciado pelo sistema. */
+// Guarda os dados do supermercado (só existe um)
 public interface SupermarketRepository {
-    Optional<Supermarket> find();
+    // Devolve null se ainda não foi cadastrado
+    Supermarket find();
 
     void save(Supermarket supermarket);
 }

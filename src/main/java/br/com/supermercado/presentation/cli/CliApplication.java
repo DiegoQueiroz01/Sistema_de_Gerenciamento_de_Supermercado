@@ -3,30 +3,25 @@ package br.com.supermercado.presentation.cli;
 import br.com.supermercado.AppServices;
 import br.com.supermercado.domain.user.User;
 
-import java.util.Objects;
-
-/** Ciclo da aplicação no terminal: tela inicial, login e menu do perfil até o usuário sair. */
-public final class CliApplication {
+// Tela inicial do sistema: faz o login e abre o menu do perfil do usuário
+public class CliApplication {
     private static final int MAX_LOGIN_ATTEMPTS = 3;
 
     private final AppServices app;
     private final InputReader in;
     private final TerminalOutput out;
     private final MenuRouter router;
-    private final String storageDescription;
 
-    public CliApplication(AppServices app, InputReader in, TerminalOutput out, String storageDescription) {
-        this.app = Objects.requireNonNull(app);
-        this.in = Objects.requireNonNull(in);
-        this.out = Objects.requireNonNull(out);
+    public CliApplication(AppServices app, InputReader in, TerminalOutput out) {
+        this.app = app;
+        this.in = in;
+        this.out = out;
         this.router = new MenuRouter(app, in, out);
-        this.storageDescription = storageDescription;
     }
 
     public void run() {
         out.println("==========================================");
         out.println("  " + app.store().current().name().toUpperCase() + " - Gerenciamento de Supermercado");
-        out.println("  Armazenamento: " + storageDescription);
         out.println("==========================================");
         int option;
         do {
@@ -43,7 +38,7 @@ public final class CliApplication {
         out.println("Programa encerrado. Até logo!");
     }
 
-    /** Até 3 tentativas; devolve null se todas falharem. */
+    // Até 3 tentativas. Devolve null se errar todas.
     private User login() {
         out.title("Login");
         for (int attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt++) {

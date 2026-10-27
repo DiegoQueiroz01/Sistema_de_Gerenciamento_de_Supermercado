@@ -1,15 +1,12 @@
 package br.com.supermercado.domain.sales;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
-/**
- * Venda finalizada: agrupa um ou mais itens. É imutável depois de criada.
- * O caixa e a senha do cliente são opcionais (venda feita fora de uma fila).
- */
-public final class Sale {
+// Venda finalizada. O caixa e a senha do cliente podem ficar null
+// quando a venda é feita sem fila.
+public class Sale {
     private final long id;
     private final LocalDateTime dateTime;
     private final String cashier;
@@ -22,28 +19,40 @@ public final class Sale {
         if (id <= 0) {
             throw new IllegalArgumentException("O identificador da venda deve ser positivo.");
         }
-        Objects.requireNonNull(dateTime, "A data da venda é obrigatória.");
+        if (dateTime == null) {
+            throw new IllegalArgumentException("A data da venda é obrigatória.");
+        }
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("Uma venda precisa ter ao menos um item.");
         }
         this.id = id;
         this.dateTime = dateTime;
-        this.cashier = cashier == null || cashier.isBlank() ? "-" : cashier.trim();
-        this.checkoutId = blankToNull(checkoutId);
-        this.customerTicket = blankToNull(customerTicket);
-        this.items = List.copyOf(items);
+        if (cashier == null || cashier.isBlank()) {
+            this.cashier = "-";
+        } else {
+            this.cashier = cashier.trim();
+        }
+        this.checkoutId = emptyToNull(checkoutId);
+        this.customerTicket = emptyToNull(customerTicket);
+        this.items = new ArrayList<>(items);
     }
 
-    private static String blankToNull(String text) {
-        return text == null || text.isBlank() ? null : text.trim();
+    private static String emptyToNull(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        return text.trim();
     }
 
     public long id() { return id; }
     public LocalDateTime dateTime() { return dateTime; }
     public String cashier() { return cashier; }
-    public Optional<String> checkoutId() { return Optional.ofNullable(checkoutId); }
-    public Optional<String> customerTicket() { return Optional.ofNullable(customerTicket); }
-    public List<SaleItem> items() { return items; }
+    public String checkoutId() { return checkoutId; }
+    public String customerTicket() { return customerTicket; }
+
+    public List<SaleItem> items() {
+        return new ArrayList<>(items);
+    }
 
     public double total() {
         double total = 0;

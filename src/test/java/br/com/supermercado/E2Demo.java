@@ -12,7 +12,7 @@ import java.util.NoSuchElementException;
 import java.util.Scanner;
 
 /**
- * Demonstração isolada de caixas e filas, sem login e sem MySQL.
+ * Demonstração isolada de caixas e filas, sem login.
  * Abre o menu de caixas com 5 caixas (3 abertos), 7 clientes e 2 atendimentos.
  */
 public final class E2Demo {

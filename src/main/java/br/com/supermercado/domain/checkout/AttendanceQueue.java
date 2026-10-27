@@ -1,15 +1,13 @@
 package br.com.supermercado.domain.checkout;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
-/**
- * Fila de um caixa: FIFO para clientes comuns; prioritários entram depois dos
- * prioritários já presentes e antes dos comuns. Tem capacidade máxima.
- */
-public final class AttendanceQueue {
+// Fila de um caixa feita com lista encadeada.
+// Clientes comuns entram no final (FIFO). Prioritários entram depois dos outros
+// prioritários, mas antes de todos os comuns.
+public class AttendanceQueue {
     public static final int DEFAULT_CAPACITY = 100;
 
     private final LinkedList<Customer> customers = new LinkedList<>();
@@ -27,76 +25,79 @@ public final class AttendanceQueue {
     }
 
     public void enqueue(Customer customer) {
-        Objects.requireNonNull(customer, "O cliente é obrigatório.");
-        ensureCanAdd(customer.id());
+        checkCanAdd(customer);
 
         if (!customer.priority()) {
             customers.addLast(customer);
             return;
         }
 
-        int insertionIndex = 0;
-        while (insertionIndex < customers.size()
-                && customers.get(insertionIndex).priority()) {
-            insertionIndex++;
+        // procura a posição logo depois do último prioritário
+        int index = 0;
+        while (index < customers.size() && customers.get(index).priority()) {
+            index++;
         }
-        customers.add(insertionIndex, customer);
+        customers.add(index, customer);
     }
 
-    /**
-     * Recebe um cliente vindo de outra fila (transferência ou fechamento de caixa):
-     * prioritários continuam à frente dos comuns e, dentro de cada grupo,
-     * a posição segue o horário de chegada.
-     */
+    // Usado quando o cliente vem de outra fila (transferência ou caixa fechado).
+    // Prioritários continuam na frente e, dentro de cada grupo, vale a hora de chegada.
     public void enqueueByArrival(Customer customer) {
-        Objects.requireNonNull(customer, "O cliente é obrigatório.");
-        ensureCanAdd(customer.id());
+        checkCanAdd(customer);
 
-        int insertionIndex = 0;
-        while (insertionIndex < customers.size()
-                && goesBefore(customers.get(insertionIndex), customer)) {
-            insertionIndex++;
+        int index = 0;
+        while (index < customers.size() && goesBefore(customers.get(index), customer)) {
+            index++;
         }
-        customers.add(insertionIndex, customer);
+        customers.add(index, customer);
     }
 
-    private static boolean goesBefore(Customer queued, Customer incoming) {
+    private boolean goesBefore(Customer queued, Customer incoming) {
         if (queued.priority() != incoming.priority()) {
             return queued.priority();
         }
         return !queued.arrivalTime().isAfter(incoming.arrivalTime());
     }
 
-    public Optional<Customer> peekNext() {
-        return Optional.ofNullable(customers.peekFirst());
+    // Devolve o primeiro da fila sem remover (null se a fila estiver vazia)
+    public Customer peekNext() {
+        return customers.peekFirst();
     }
 
-    public Optional<Customer> removeNext() {
-        return customers.isEmpty()
-                ? Optional.empty()
-                : Optional.of(customers.removeFirst());
+    // Remove e devolve o primeiro da fila (null se a fila estiver vazia)
+    public Customer removeNext() {
+        return customers.pollFirst();
     }
 
-    public Optional<Customer> remove(long customerId) {
-        for (int index = 0; index < customers.size(); index++) {
-            if (customers.get(index).id() == customerId) {
-                return Optional.of(customers.remove(index));
+    // Remove o cliente com esse id; devolve null se ele não estiver na fila
+    public Customer remove(long customerId) {
+        for (int i = 0; i < customers.size(); i++) {
+            if (customers.get(i).id() == customerId) {
+                return customers.remove(i);
             }
         }
-        return Optional.empty();
+        return null;
     }
 
     public boolean contains(long customerId) {
-        return customers.stream().anyMatch(customer -> customer.id() == customerId);
+        for (Customer c : customers) {
+            if (c.id() == customerId) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    public Optional<Customer> findByTicket(String ticket) {
+    public Customer findByTicket(String ticket) {
         if (ticket == null) {
-            return Optional.empty();
+            return null;
         }
-        return customers.stream()
-                .filter(customer -> customer.ticket().equalsIgnoreCase(ticket.trim()))
-                .findFirst();
+        for (Customer c : customers) {
+            if (c.ticket().equalsIgnoreCase(ticket.trim())) {
+                return c;
+            }
+        }
+        return null;
     }
 
     public int size() {
@@ -119,14 +120,17 @@ public final class AttendanceQueue {
         return customers.size() >= capacity;
     }
 
+    // Cópia da fila, para mostrar na tela sem permitir alterar a original
     public List<Customer> snapshot() {
-        return List.copyOf(customers);
+        return new ArrayList<>(customers);
     }
 
-    private void ensureCanAdd(long customerId) {
-        if (contains(customerId)) {
-            throw new IllegalArgumentException(
-                    "O cliente já está nesta fila: " + customerId);
+    private void checkCanAdd(Customer customer) {
+        if (customer == null) {
+            throw new IllegalArgumentException("O cliente é obrigatório.");
+        }
+        if (contains(customer.id())) {
+            throw new IllegalArgumentException("O cliente já está nesta fila: " + customer.id());
         }
         if (isFull()) {
             throw new IllegalStateException("A fila está cheia (capacidade " + capacity + ").");

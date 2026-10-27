@@ -9,7 +9,7 @@ public interface StockMovementRepository {
 
     void save(StockMovement movement);
 
-    /** Todas as movimentações, em ordem de registro (mais antiga primeiro). */
+    // Movimentações na ordem em que foram registradas (mais antiga primeiro)
     List<StockMovement> findAll();
 
     List<StockMovement> findByProductCode(String productCode);

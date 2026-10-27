@@ -7,13 +7,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
-/**
- * Lista em ordem de registro (histórico de vendas) + mapa por número da venda
- * para consulta direta de um cupom.
- */
-public final class InMemorySaleRepository implements SaleRepository {
+// Lista com as vendas na ordem de registro (histórico) e
+// um mapa pelo número da venda para achar um cupom rápido.
+public class InMemorySaleRepository implements SaleRepository {
     private final List<Sale> sales = new ArrayList<>();
     private final Map<Long, Sale> salesById = new HashMap<>();
     private long nextId = 1;
@@ -33,12 +30,12 @@ public final class InMemorySaleRepository implements SaleRepository {
     }
 
     @Override
-    public Optional<Sale> findById(long id) {
-        return Optional.ofNullable(salesById.get(id));
+    public Sale findById(long id) {
+        return salesById.get(id);
     }
 
     @Override
     public List<Sale> findAll() {
-        return List.copyOf(sales);
+        return new ArrayList<>(sales);
     }
 }

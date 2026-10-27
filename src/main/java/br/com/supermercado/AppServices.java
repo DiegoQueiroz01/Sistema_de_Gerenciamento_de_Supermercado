@@ -15,47 +15,41 @@ import br.com.supermercado.infrastructure.memory.InMemoryServiceRecordRepository
 import br.com.supermercado.infrastructure.memory.InMemoryStockMovementRepository;
 import br.com.supermercado.infrastructure.memory.InMemorySupermarketRepository;
 import br.com.supermercado.infrastructure.memory.InMemoryUserRepository;
-import br.com.supermercado.infrastructure.mysql.MySQLProductRepository;
-import br.com.supermercado.infrastructure.mysql.MySQLStockMovementRepository;
-import br.com.supermercado.repositories.ProductRepository;
-import br.com.supermercado.repositories.StockMovementRepository;
 
-/** Serviços da aplicação já ligados aos repositórios escolhidos. */
-public record AppServices(
-        AuthService auth,
-        SupermarketService store,
-        ProductService products,
-        InventoryService inventory,
-        SaleService sales,
-        QueueService queues,
-        DashboardService dashboard) {
+// Junta todos os serviços do sistema, já ligados aos repositórios em memória
+public class AppServices {
+    private final AuthService auth;
+    private final SupermarketService store;
+    private final ProductService products;
+    private final InventoryService inventory;
+    private final SaleService sales;
+    private final QueueService queues;
+    private final DashboardService dashboard;
 
-    /** Tudo em memória (estruturas de dados), sem banco de dados. */
-    public static AppServices inMemory() {
-        return create(new InMemoryProductRepository(), new InMemoryStockMovementRepository());
-    }
-
-    /** Produtos, categorias e movimentações de estoque no MySQL; o restante em memória. */
-    public static AppServices withMySQL() {
-        return create(new MySQLProductRepository(), new MySQLStockMovementRepository());
-    }
-
-    private static AppServices create(ProductRepository productRepository,
-                                      StockMovementRepository movementRepository) {
+    private AppServices() {
+        InMemoryProductRepository productRepository = new InMemoryProductRepository();
         InMemorySaleRepository saleRepository = new InMemorySaleRepository();
-        ProductService products = new ProductService(productRepository);
-        InventoryService inventory = new InventoryService(productRepository, movementRepository,
+
+        products = new ProductService(productRepository);
+        inventory = new InventoryService(productRepository, new InMemoryStockMovementRepository(),
                 SaleService.salesSource(saleRepository));
-        SaleService sales = new SaleService(saleRepository, products, inventory);
-        QueueService queues = new QueueService(new InMemoryCheckoutRepository(),
-                new InMemoryServiceRecordRepository(), AttendanceQueue.DEFAULT_CAPACITY);
-        return new AppServices(
-                new AuthService(new InMemoryUserRepository()),
-                new SupermarketService(new InMemorySupermarketRepository()),
-                products,
-                inventory,
-                sales,
-                queues,
-                new DashboardService(queues, products, inventory, sales));
+        sales = new SaleService(saleRepository, products, inventory);
+        queues = new QueueService(new InMemoryCheckoutRepository(), new InMemoryServiceRecordRepository(),
+                AttendanceQueue.DEFAULT_CAPACITY);
+        auth = new AuthService(new InMemoryUserRepository());
+        store = new SupermarketService(new InMemorySupermarketRepository());
+        dashboard = new DashboardService(queues, products, inventory, sales);
     }
+
+    public static AppServices inMemory() {
+        return new AppServices();
+    }
+
+    public AuthService auth() { return auth; }
+    public SupermarketService store() { return store; }
+    public ProductService products() { return products; }
+    public InventoryService inventory() { return inventory; }
+    public SaleService sales() { return sales; }
+    public QueueService queues() { return queues; }
+    public DashboardService dashboard() { return dashboard; }
 }

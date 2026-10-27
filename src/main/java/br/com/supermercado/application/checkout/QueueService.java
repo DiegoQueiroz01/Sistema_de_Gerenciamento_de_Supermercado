@@ -2,7 +2,6 @@ package br.com.supermercado.application.checkout;
 
 import br.com.supermercado.domain.checkout.AttendanceQueue;
 import br.com.supermercado.domain.checkout.Checkout;
-import br.com.supermercado.domain.checkout.CheckoutStatus;
 import br.com.supermercado.domain.checkout.Customer;
 import br.com.supermercado.domain.checkout.ServiceRecord;
 import br.com.supermercado.infrastructure.memory.InMemoryCheckoutRepository;
@@ -11,16 +10,27 @@ import br.com.supermercado.repositories.CheckoutRepository;
 import br.com.supermercado.repositories.ServiceRecordRepository;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
-/**
- * Casos de uso de caixas e filas. Os caixas e o histórico de atendimentos ficam nos
- * repositórios; cada alteração em um caixa é gravada de volta com save.
- */
-public final class QueueService {
+// Operações de caixas e filas: abrir/fechar caixa, chegada de cliente,
+// atendimento, transferência e histórico.
+public class QueueService {
+
+    // Resultado da chegada de um cliente: o cliente criado e o caixa para onde ele foi
+    public static class CustomerAssignment {
+        private final Customer customer;
+        private final String checkoutId;
+
+        public CustomerAssignment(Customer customer, String checkoutId) {
+            this.customer = customer;
+            this.checkoutId = checkoutId;
+        }
+
+        public Customer customer() { return customer; }
+        public String checkoutId() { return checkoutId; }
+    }
+
     private final CheckoutRepository checkoutRepository;
     private final ServiceRecordRepository recordRepository;
     private int queueCapacity;
@@ -40,17 +50,16 @@ public final class QueueService {
         if (queueCapacity < 1) {
             throw new IllegalArgumentException("A capacidade da fila deve ser positiva.");
         }
-        this.checkoutRepository = Objects.requireNonNull(checkoutRepository);
-        this.recordRepository = Objects.requireNonNull(recordRepository);
+        this.checkoutRepository = checkoutRepository;
+        this.recordRepository = recordRepository;
         this.queueCapacity = queueCapacity;
     }
 
-    /** Capacidade máxima de fila usada nos caixas criados a partir de agora. */
     public int queueCapacity() {
         return queueCapacity;
     }
 
-    /** Parâmetro do administrador: vale para os caixas criados depois da alteração. */
+    // Parâmetro do administrador: só vale para os caixas criados depois
     public void changeQueueCapacity(int capacity) {
         if (capacity < 1) {
             throw new IllegalArgumentException("A capacidade da fila deve ser positiva.");
@@ -58,53 +67,58 @@ public final class QueueService {
         this.queueCapacity = capacity;
     }
 
-    /** Cria um caixa fechado com o próximo número livre ("1", "2", ...). */
+    // Cria um caixa fechado com o próximo número livre ("1", "2", ...)
     public Checkout createCheckout() {
-        while (findCheckout(String.valueOf(nextCheckoutNumber)).isPresent()) {
+        while (findCheckout(String.valueOf(nextCheckoutNumber)) != null) {
             nextCheckoutNumber++;
         }
-        Checkout checkout = new Checkout(String.valueOf(nextCheckoutNumber++), queueCapacity);
+        Checkout checkout = new Checkout(String.valueOf(nextCheckoutNumber), queueCapacity);
+        nextCheckoutNumber++;
         checkoutRepository.save(checkout);
         return checkout;
     }
 
     public Checkout openCheckout(String checkoutId) {
-        Checkout checkout = findCheckout(checkoutId)
-                .orElseGet(() -> new Checkout(checkoutId.trim(), queueCapacity));
+        Checkout checkout = findCheckout(checkoutId);
+        if (checkout == null) {
+            checkout = new Checkout(checkoutId.trim(), queueCapacity);
+        }
         checkout.open();
         checkoutRepository.save(checkout);
         return checkout;
     }
 
-    /**
-     * Fecha o caixa. Um atendimento em andamento é concluído e os clientes aguardando
-     * são redistribuídos para as menores filas abertas; se não couberem, o fechamento é recusado.
-     */
+    // Fecha o caixa. Se tiver alguém sendo atendido, o atendimento termina.
+    // Quem estava na fila vai para as menores filas dos outros caixas abertos.
+    // Se não couber todo mundo, o caixa não fecha.
     public void closeCheckout(String checkoutId) {
-        Checkout checkout = requireCheckout(checkoutId);
-        if (checkout.status() != CheckoutStatus.OPEN) {
+        Checkout checkout = getCheckout(checkoutId);
+        if (!checkout.isOpen()) {
             throw new IllegalStateException("O caixa já está fechado: " + checkoutId);
         }
 
         int waiting = checkout.waitingCount();
         if (waiting > 0) {
-            if (checkoutRepository.findAll().stream().noneMatch(other ->
-                    other != checkout && other.status() == CheckoutStatus.OPEN)) {
-                throw new IllegalStateException(
-                        "Abra outro caixa antes de fechar este: há clientes aguardando.");
+            boolean hasOtherOpen = false;
+            int freeSlots = 0;
+            for (Checkout other : checkouts()) {
+                if (other != checkout && other.isOpen()) {
+                    hasOtherOpen = true;
+                    freeSlots += other.freeSlots();
+                }
             }
-            if (freeSlotsExcluding(checkout) < waiting) {
-                throw new IllegalStateException(
-                        "Os outros caixas abertos não têm espaço para os clientes aguardando.");
+            if (!hasOtherOpen) {
+                throw new IllegalStateException("Abra outro caixa antes de fechar este: há clientes aguardando.");
+            }
+            if (freeSlots < waiting) {
+                throw new IllegalStateException("Os outros caixas abertos não têm espaço para os clientes aguardando.");
             }
         }
 
         checkout.finishService();
         while (checkout.waitingCount() > 0) {
-            Customer customer = checkout.removeNextCustomer().orElseThrow();
-            Checkout destination = findShortestOpenCheckout(checkout)
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Não há outro caixa aberto para receber os clientes."));
+            Customer customer = checkout.removeNextCustomer();
+            Checkout destination = findShortestOpenCheckout(checkout);
             destination.enqueueByArrival(customer);
             checkoutRepository.save(destination);
         }
@@ -112,9 +126,9 @@ public final class QueueService {
         checkoutRepository.save(checkout);
     }
 
-    /** Remove um caixa fechado e sem clientes. */
+    // Só remove caixa fechado (e caixa fechado não tem fila)
     public void removeCheckout(String checkoutId) {
-        Checkout checkout = requireCheckout(checkoutId);
+        Checkout checkout = getCheckout(checkoutId);
         if (checkout.isOpen()) {
             throw new IllegalStateException("Feche o caixa antes de removê-lo: " + checkoutId);
         }
@@ -125,100 +139,96 @@ public final class QueueService {
         return registerArrival(Customer.DEFAULT_NAME, priority, arrivalTime);
     }
 
-    /** Registra a chegada com senha sequencial e direciona o cliente para a menor fila com espaço. */
-    public CustomerAssignment registerArrival(String name, boolean priority,
-                                              LocalDateTime arrivalTime) {
-        Objects.requireNonNull(arrivalTime, "O horário de chegada é obrigatório.");
-        Checkout checkout = findShortestOpenCheckout(null)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Não há caixas abertos com espaço para receber clientes."));
+    // Gera a senha do cliente e coloca ele na menor fila que ainda tem espaço
+    public CustomerAssignment registerArrival(String name, boolean priority, LocalDateTime arrivalTime) {
+        if (arrivalTime == null) {
+            throw new IllegalArgumentException("O horário de chegada é obrigatório.");
+        }
+        Checkout checkout = findShortestOpenCheckout(null);
+        if (checkout == null) {
+            throw new IllegalStateException("Não há caixas abertos com espaço para receber clientes.");
+        }
 
-        long id = nextCustomerId++;
+        long id = nextCustomerId;
+        nextCustomerId++;
         Customer customer = new Customer(id, Customer.formatTicket(id), name, priority, arrivalTime);
         checkout.enqueue(customer);
         checkoutRepository.save(checkout);
         return new CustomerAssignment(customer, checkout.id());
     }
 
-    public void transferCustomer(long customerId, String sourceCheckoutId,
-                                 String destinationCheckoutId) {
-        Checkout source = requireCheckout(sourceCheckoutId);
-        Checkout destination = requireCheckout(destinationCheckoutId);
+    public void transferCustomer(long customerId, String sourceCheckoutId, String destinationCheckoutId) {
+        Checkout source = getCheckout(sourceCheckoutId);
+        Checkout destination = getCheckout(destinationCheckoutId);
         if (sourceCheckoutId.equals(destinationCheckoutId)) {
             throw new IllegalArgumentException("A origem e o destino devem ser diferentes.");
         }
-
-        if (source.status() != CheckoutStatus.OPEN
-                || destination.status() != CheckoutStatus.OPEN) {
+        if (!source.isOpen() || !destination.isOpen()) {
             throw new IllegalStateException("Origem e destino devem estar abertos.");
         }
         if (destination.hasCustomer(customerId)) {
-            throw new IllegalArgumentException(
-                    "O cliente já está na fila de destino: " + customerId);
+            throw new IllegalArgumentException("O cliente já está na fila de destino: " + customerId);
         }
         if (destination.isQueueFull()) {
-            throw new IllegalStateException(
-                    "A fila do caixa de destino está cheia: " + destinationCheckoutId);
+            throw new IllegalStateException("A fila do caixa de destino está cheia: " + destinationCheckoutId);
         }
 
-        Customer customer = source.removeCustomer(customerId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "O cliente não está na fila de origem: " + customerId));
+        Customer customer = source.removeCustomer(customerId);
+        if (customer == null) {
+            throw new IllegalArgumentException("O cliente não está na fila de origem: " + customerId);
+        }
         destination.enqueueByArrival(customer);
         checkoutRepository.save(source);
         checkoutRepository.save(destination);
     }
 
-    /** Transfere pela senha do cliente (ex.: "S003"). */
-    public void transferCustomer(String ticket, String sourceCheckoutId,
-                                 String destinationCheckoutId) {
-        Customer customer = requireCheckout(sourceCheckoutId).findWaitingByTicket(ticket)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Senha não encontrada na fila de origem: " + ticket));
+    // Transferência usando a senha do cliente (ex.: "S003")
+    public void transferCustomer(String ticket, String sourceCheckoutId, String destinationCheckoutId) {
+        Customer customer = getCheckout(sourceCheckoutId).findWaitingByTicket(ticket);
+        if (customer == null) {
+            throw new IllegalArgumentException("Senha não encontrada na fila de origem: " + ticket);
+        }
         transferCustomer(customer.id(), sourceCheckoutId, destinationCheckoutId);
     }
 
-    /**
-     * Chama o próximo cliente da fila. Se houver alguém em atendimento, esse atendimento
-     * é concluído primeiro. Registra o início do atendimento para o cálculo da espera.
-     */
-    public Optional<ServiceRecord> startNextAttendance(
-            String checkoutId, LocalDateTime serviceStartedAt) {
-        Objects.requireNonNull(serviceStartedAt, "O horário de atendimento é obrigatório.");
-        Checkout checkout = requireCheckout(checkoutId);
-        Customer customer = checkout.peekNextCustomer().orElse(null);
+    // Chama o próximo da fila. Se já tinha alguém sendo atendido, esse atendimento termina antes.
+    // Devolve o registro do atendimento ou null se a fila estiver vazia.
+    public ServiceRecord startNextAttendance(String checkoutId, LocalDateTime serviceStartedAt) {
+        if (serviceStartedAt == null) {
+            throw new IllegalArgumentException("O horário de atendimento é obrigatório.");
+        }
+        Checkout checkout = getCheckout(checkoutId);
+        Customer customer = checkout.peekNextCustomer();
         checkout.finishService();
         if (customer == null) {
             checkoutRepository.save(checkout);
-            return Optional.empty();
+            return null;
         }
 
-        ServiceRecord record = new ServiceRecord(
-                recordRepository.nextId(),
-                checkout.id(),
-                customer,
+        ServiceRecord record = new ServiceRecord(recordRepository.nextId(), checkout.id(), customer,
                 serviceStartedAt);
-        checkout.removeNextCustomer().orElseThrow();
+        checkout.removeNextCustomer();
         checkout.startService(customer);
         checkoutRepository.save(checkout);
         recordRepository.save(record);
-        return Optional.of(record);
+        return record;
     }
 
-    /** Conclui o atendimento em andamento no caixa, sem chamar o próximo. */
-    public Optional<Customer> finishAttendance(String checkoutId) {
-        Checkout checkout = requireCheckout(checkoutId);
-        Optional<Customer> finished = checkout.finishService();
+    // Termina o atendimento atual sem chamar o próximo. Devolve o cliente atendido ou null.
+    public Customer finishAttendance(String checkoutId) {
+        Checkout checkout = getCheckout(checkoutId);
+        Customer finished = checkout.finishService();
         checkoutRepository.save(checkout);
         return finished;
     }
 
-    public Optional<Checkout> checkout(String checkoutId) {
+    // Devolve null se o caixa não existir
+    public Checkout checkout(String checkoutId) {
         return findCheckout(checkoutId);
     }
 
-    /** Caixa aberto com a menor fila e espaço disponível. */
-    public Optional<Checkout> shortestOpenCheckout() {
+    // Caixa aberto com a menor fila e com espaço (null se não houver)
+    public Checkout shortestOpenCheckout() {
         return findShortestOpenCheckout(null);
     }
 
@@ -227,7 +237,13 @@ public final class QueueService {
     }
 
     public List<Checkout> openCheckouts() {
-        return checkouts().stream().filter(Checkout::isOpen).toList();
+        List<Checkout> open = new ArrayList<>();
+        for (Checkout c : checkouts()) {
+            if (c.isOpen()) {
+                open.add(c);
+            }
+        }
+        return open;
     }
 
     public List<ServiceRecord> serviceRecords() {
@@ -235,53 +251,53 @@ public final class QueueService {
     }
 
     public List<ServiceRecord> serviceRecordsOf(String checkoutId) {
-        return recordRepository.findByCheckoutId(requireCheckout(checkoutId).id());
+        return recordRepository.findByCheckoutId(getCheckout(checkoutId).id());
     }
 
     public int totalWaiting() {
-        return checkouts().stream().mapToInt(Checkout::waitingCount).sum();
+        int total = 0;
+        for (Checkout c : checkouts()) {
+            total += c.waitingCount();
+        }
+        return total;
     }
 
-    /** Média de clientes aguardando por caixa aberto. */
+    // Média de clientes esperando por caixa aberto
     public double averageLoad() {
         int open = openCheckouts().size();
-        return open == 0 ? 0 : (double) totalWaiting() / open;
+        if (open == 0) {
+            return 0;
+        }
+        return (double) totalWaiting() / open;
     }
 
-    private int freeSlotsExcluding(Checkout excludedCheckout) {
-        return checkouts().stream()
-                .filter(checkout -> checkout != excludedCheckout && checkout.isOpen())
-                .mapToInt(Checkout::freeSlots)
-                .sum();
+    // Percorre os caixas e guarda o aberto com menos gente na fila.
+    // O caixa "ignored" fica de fora (usado ao fechar um caixa).
+    private Checkout findShortestOpenCheckout(Checkout ignored) {
+        Checkout shortest = null;
+        for (Checkout c : checkouts()) {
+            if (c == ignored || !c.isOpen() || c.isQueueFull()) {
+                continue;
+            }
+            if (shortest == null || c.waitingCount() < shortest.waitingCount()) {
+                shortest = c;
+            }
+        }
+        return shortest;
     }
 
-    private Optional<Checkout> findShortestOpenCheckout(Checkout excludedCheckout) {
-        return checkouts().stream()
-                .filter(checkout -> checkout != excludedCheckout)
-                .filter(checkout -> checkout.status() == CheckoutStatus.OPEN)
-                .filter(checkout -> !checkout.isQueueFull())
-                .min(Comparator.comparingInt(Checkout::waitingCount));
+    private Checkout getCheckout(String checkoutId) {
+        Checkout checkout = findCheckout(checkoutId);
+        if (checkout == null) {
+            throw new IllegalArgumentException("Caixa não encontrado: " + checkoutId);
+        }
+        return checkout;
     }
 
-    private Checkout requireCheckout(String checkoutId) {
-        return findCheckout(checkoutId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Caixa não encontrado: " + checkoutId));
-    }
-
-    private Optional<Checkout> findCheckout(String checkoutId) {
+    private Checkout findCheckout(String checkoutId) {
         if (checkoutId == null || checkoutId.isBlank()) {
             throw new IllegalArgumentException("O identificador do caixa é obrigatório.");
         }
         return checkoutRepository.findById(checkoutId.trim());
-    }
-
-    public record CustomerAssignment(Customer customer, String checkoutId) {
-        public CustomerAssignment {
-            Objects.requireNonNull(customer, "O cliente é obrigatório.");
-            if (checkoutId == null || checkoutId.isBlank()) {
-                throw new IllegalArgumentException("O identificador do caixa é obrigatório.");
-            }
-        }
     }
 }

@@ -7,11 +7,8 @@ import br.com.supermercado.domain.product.Product;
 
 import java.time.LocalDateTime;
 
-/**
- * Parte do menu do ADMINISTRADOR: produtos, categorias, movimentações e relatórios de estoque.
- * O AdminMenu chama {@link #run()} em uma de suas opções.
- */
-public final class ProductAdminMenu extends StockMenuBase {
+// Parte do menu do ADMINISTRADOR: produtos, categorias, estoque e relatórios
+public class ProductAdminMenu extends StockMenuBase {
 
     public ProductAdminMenu(InputReader in, TerminalOutput out, ProductService products,
                             InventoryService inventory, String responsible) {
@@ -21,13 +18,14 @@ public final class ProductAdminMenu extends StockMenuBase {
     public void run() {
         int option;
         do {
-            option = readMenuOption("PRODUTOS E ESTOQUE (ADMINISTRADOR)",
+            option = in.readMenuOption("PRODUTOS E ESTOQUE (ADMINISTRADOR)",
                     "Produtos (cadastro, edição e consultas)", "Estoque e relatórios", "Categorias");
-            switch (option) {
-                case 1 -> productsMenu();
-                case 2 -> reportsMenu();
-                case 3 -> categoriesMenu();
-                default -> { }
+            if (option == 1) {
+                productsMenu();
+            } else if (option == 2) {
+                reportsMenu();
+            } else if (option == 3) {
+                categoriesMenu();
             }
         } while (option != 0);
     }
@@ -35,23 +33,22 @@ public final class ProductAdminMenu extends StockMenuBase {
     private void productsMenu() {
         int option;
         do {
-            option = readMenuOption("PRODUTOS", "Cadastrar produto", "Editar produto",
+            option = in.readMenuOption("PRODUTOS", "Cadastrar produto", "Editar produto",
                     "Definir estoque mínimo", "Pesquisar por código ou nome", "Filtrar por categoria",
                     "Listar ordenado", "Listar todos", "Desativar produto");
             try {
                 switch (option) {
-                    case 1 -> registerProduct();
-                    case 2 -> editProduct();
-                    case 3 -> defineMinimumStock();
-                    case 4 -> search();
-                    case 5 -> filterByCategory();
-                    case 6 -> listSorted();
-                    case 7 -> listAll();
-                    case 8 -> deactivateProduct();
-                    default -> { }
+                    case 1: registerProduct(); break;
+                    case 2: editProduct(); break;
+                    case 3: defineMinimumStock(); break;
+                    case 4: search(); break;
+                    case 5: filterByCategory(); break;
+                    case 6: listSorted(); break;
+                    case 7: listAll(); break;
+                    case 8: deactivateProduct(); break;
                 }
             } catch (IllegalArgumentException | IllegalStateException e) {
-                error(e.getMessage());
+                out.error(e.getMessage());
             }
         } while (option != 0);
     }
@@ -59,21 +56,20 @@ public final class ProductAdminMenu extends StockMenuBase {
     private void reportsMenu() {
         int option;
         do {
-            option = readMenuOption("ESTOQUE E RELATÓRIOS", "Registrar entrada de estoque",
+            option = in.readMenuOption("ESTOQUE E RELATÓRIOS", "Registrar entrada de estoque",
                     "Registrar saída (perda, avaria, consumo)", "Produtos abaixo do estoque mínimo",
                     "Produtos sem movimentação", "Produtos mais vendidos", "Histórico de movimentações");
             try {
                 switch (option) {
-                    case 1 -> registerEntry();
-                    case 2 -> registerExit();
-                    case 3 -> belowMinimum();
-                    case 4 -> withoutMovement();
-                    case 5 -> topSelling();
-                    case 6 -> history();
-                    default -> { }
+                    case 1: registerEntry(); break;
+                    case 2: registerExit(); break;
+                    case 3: belowMinimum(); break;
+                    case 4: withoutMovement(); break;
+                    case 5: topSelling(); break;
+                    case 6: history(); break;
                 }
             } catch (IllegalArgumentException | IllegalStateException e) {
-                error(e.getMessage());
+                out.error(e.getMessage());
             }
         } while (option != 0);
     }
@@ -81,96 +77,114 @@ public final class ProductAdminMenu extends StockMenuBase {
     private void categoriesMenu() {
         int option;
         do {
-            option = readMenuOption("CATEGORIAS", "Listar categorias", "Nova categoria");
+            option = in.readMenuOption("CATEGORIAS", "Listar categorias", "Nova categoria");
             try {
                 if (option == 1) {
-                    title("Categorias");
-                    products.listCategories().forEach(c -> println("  - " + c.name()));
+                    out.title("Categorias");
+                    for (Category c : products.listCategories()) {
+                        out.println("  - " + c.name());
+                    }
                 } else if (option == 2) {
-                    products.registerCategory(readRequired("Nome da categoria: "));
-                    success("Categoria cadastrada.");
+                    products.registerCategory(in.readRequired("Nome da categoria: "));
+                    out.success("Categoria cadastrada.");
                 }
             } catch (IllegalArgumentException | IllegalStateException e) {
-                error(e.getMessage());
+                out.error(e.getMessage());
             }
         } while (option != 0);
     }
 
     private void registerProduct() {
-        title("Novo Produto");
+        out.title("Novo Produto");
         if (products.listCategories().isEmpty()) {
-            error("Cadastre ao menos uma categoria antes de cadastrar produtos.");
+            out.error("Cadastre ao menos uma categoria antes de cadastrar produtos.");
             return;
         }
-        String code;
-        while (true) {
-            code = readRequired("Código de barras: ");
-            if (products.findByCode(code).isEmpty()) break;
-            error("Código já cadastrado no sistema.");
+        String code = in.readRequired("Código de barras: ");
+        while (products.findByCode(code) != null) {
+            out.error("Código já cadastrado no sistema.");
+            code = in.readRequired("Código de barras: ");
         }
-        String name = readRequired("Nome do produto: ");
+        String name = in.readRequired("Nome do produto: ");
         Category category = chooseCategory();
-        if (category == null) return;
-        double price = readPositiveDecimal("Preço de venda (R$): ");
-        int quantity = readInt("Quantidade disponível (0 a 1000000): ", 0, 1_000_000);
-        int minimum = readInt("Estoque mínimo (0 a 1000000): ", 0, 1_000_000);
+        if (category == null) {
+            return;
+        }
+        double price = in.readPositiveDecimal("Preço de venda (R$): ");
+        int quantity = in.readInt("Quantidade disponível (0 a 1000000): ", 0, 1_000_000);
+        int minimum = in.readInt("Estoque mínimo (0 a 1000000): ", 0, 1_000_000);
         LocalDateTime now = LocalDateTime.now();
         Product p = products.registerProduct(code, name, category, price, minimum, now);
         if (quantity > 0) {
-            inventory.registerEntry(p.code(), quantity, responsible, now); // estoque inicial = ENTRY
+            inventory.registerEntry(p.code(), quantity, responsible, now); // estoque inicial entra como ENTRADA
         }
-        success("Produto cadastrado: " + p.name());
-        // Relê o produto: com MySQL cada consulta devolve uma cópia nova.
-        warnIfBelowMinimum(products.requireByCode(p.code()));
+        out.success("Produto cadastrado: " + p.name());
+        warnIfBelowMinimum(p);
     }
 
     private void editProduct() {
-        title("Editar Produto");
+        out.title("Editar Produto");
         Product p = selectProduct();
-        if (p == null) return;
-        println("Deixe em branco para manter o valor atual.");
-        String name = readLine("Nome [" + p.name() + "]: ");
-        if (name.isEmpty()) name = p.name();
-        Category category = p.category();
-        if (confirm("Alterar a categoria (atual: " + category.name() + ")?")) {
-            Category chosen = chooseCategory();
-            if (chosen != null) category = chosen;
+        if (p == null) {
+            return;
         }
-        String priceText = readLine("Preço [" + money(p.price()) + "]: ").replace(',', '.');
-        double price = priceText.isEmpty() ? p.price() : parseDecimal(priceText);
-        String minText = readLine("Estoque mínimo [" + p.minimumStock() + "]: ");
-        int minimum = minText.isEmpty() ? p.minimumStock() : parseInt(minText);
+        out.println("Deixe em branco para manter o valor atual.");
+        String name = in.readLine("Nome [" + p.name() + "]: ");
+        if (name.isEmpty()) {
+            name = p.name();
+        }
+        Category category = p.category();
+        if (in.confirm("Alterar a categoria (atual: " + category.name() + ")?")) {
+            Category chosen = chooseCategory();
+            if (chosen != null) {
+                category = chosen;
+            }
+        }
+        String priceText = in.readLine("Preço [" + TerminalOutput.money(p.price()) + "]: ").replace(',', '.');
+        double price = p.price();
+        if (!priceText.isEmpty()) {
+            price = parseDecimal(priceText);
+        }
+        String minText = in.readLine("Estoque mínimo [" + p.minimumStock() + "]: ");
+        int minimum = p.minimumStock();
+        if (!minText.isEmpty()) {
+            minimum = parseInt(minText);
+        }
         products.edit(p.code(), name, category, price, minimum);
-        success("Produto atualizado. (A quantidade só muda por movimentações.)");
-        warnIfBelowMinimum(products.requireByCode(p.code()));
+        out.success("Produto atualizado. (A quantidade só muda por movimentações.)");
+        warnIfBelowMinimum(p);
     }
 
     private void deactivateProduct() {
-        title("Desativar Produto");
+        out.title("Desativar Produto");
         Product p = selectProduct();
-        if (p == null) return;
-        println("  O produto sai das consultas e das vendas; o histórico é mantido.");
-        println("  Para reativar, cadastre de novo o mesmo código.");
-        if (!confirm("Desativar '" + p.name() + "'?")) {
-            warning("Operação cancelada.");
+        if (p == null) {
+            return;
+        }
+        out.println("  O produto sai das consultas e das vendas; o histórico é mantido.");
+        out.println("  Para reativar, cadastre de novo o mesmo código.");
+        if (!in.confirm("Desativar '" + p.name() + "'?")) {
+            out.warning("Operação cancelada.");
             return;
         }
         products.deactivate(p.code());
-        success("Produto desativado: " + p.name());
+        out.success("Produto desativado: " + p.name());
     }
 
     private void defineMinimumStock() {
-        title("Definir Estoque Mínimo");
+        out.title("Definir Estoque Mínimo");
         Product p = selectProduct();
-        if (p == null) return;
-        int minimum = readInt("Novo estoque mínimo para '" + p.name() + "' (atual "
+        if (p == null) {
+            return;
+        }
+        int minimum = in.readInt("Novo estoque mínimo para '" + p.name() + "' (atual "
                 + p.minimumStock() + "): ", 0, 1_000_000);
         products.defineMinimumStock(p.code(), minimum);
-        success("Estoque mínimo atualizado para " + minimum + ".");
-        warnIfBelowMinimum(products.requireByCode(p.code()));
+        out.success("Estoque mínimo atualizado para " + minimum + ".");
+        warnIfBelowMinimum(p);
     }
 
-    private static double parseDecimal(String text) {
+    private double parseDecimal(String text) {
         try {
             return Double.parseDouble(text);
         } catch (NumberFormatException e) {
@@ -178,7 +192,7 @@ public final class ProductAdminMenu extends StockMenuBase {
         }
     }
 
-    private static int parseInt(String text) {
+    private int parseInt(String text) {
         try {
             return Integer.parseInt(text);
         } catch (NumberFormatException e) {

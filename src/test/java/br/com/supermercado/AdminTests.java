@@ -52,10 +52,10 @@ public class AdminTests {
 
         // Desativação
         check("CA02 desativar com estoque é recusado", throwsType(IllegalStateException.class,
-                () -> products.deactivate("F")) && products.findByCode("F").isPresent());
+                () -> products.deactivate("F")) && products.findByCode("F") != null);
         inventory.registerExit("F", 3, "Carlos");
         products.deactivate("F");
-        check("CA03 produto desativado sai das consultas", products.findByCode("F").isEmpty()
+        check("CA03 produto desativado sai das consultas", products.findByCode("F") == null
                 && products.listAll().size() == 2 && products.searchByName("feij").isEmpty());
         check("CA04 histórico do desativado é mantido", inventory.historyOf("F").size() == 2);
         check("CA05 desativado não pode ser vendido", throwsType(IllegalArgumentException.class,
@@ -86,7 +86,7 @@ public class AdminTests {
         app.queues().changeQueueCapacity(2);
         Checkout novo = app.queues().createCheckout();
         check("CA13 nova capacidade vale para caixas novos", novo.queueCapacity() == 2
-                && app.queues().checkout("1").orElseThrow().queueCapacity() != 2);
+                && app.queues().checkout("1").queueCapacity() != 2);
         check("CA14 capacidade inválida recusada", throwsType(IllegalArgumentException.class,
                 () -> app.queues().changeQueueCapacity(0)) && app.queues().queueCapacity() == 2);
 

@@ -7,39 +7,63 @@ import br.com.supermercado.domain.product.Product;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
-/**
- * Venda em montagem (antes de ser finalizada). Estruturas usadas:
- * - mapa ordenado por código: soma itens repetidos do mesmo produto e mantém a ordem de inclusão;
- * - pilha de inclusões: permite "desfazer o último item" na ordem inversa (LIFO).
- * O estoque é conferido a cada inclusão, mas só é baixado quando a venda é finalizada.
- */
-public final class Cart {
+// Carrinho de uma venda que ainda não foi finalizada.
+// - mapa por código: se o mesmo produto entra duas vezes, as quantidades somam;
+// - pilha de inclusões: "desfazer último item" tira na ordem inversa (LIFO).
+// O estoque é conferido a cada item, mas só baixa quando a venda é finalizada.
+public class Cart {
 
-    /** Linha do carrinho com o preço vigente do produto. */
-    public record Line(String productCode, String productName, int quantity, double unitPrice) {
+    // Uma linha do carrinho
+    public static class Line {
+        private final String productCode;
+        private final String productName;
+        private final int quantity;
+        private final double unitPrice;
+
+        public Line(String productCode, String productName, int quantity, double unitPrice) {
+            this.productCode = productCode;
+            this.productName = productName;
+            this.quantity = quantity;
+            this.unitPrice = unitPrice;
+        }
+
+        public String productCode() { return productCode; }
+        public String productName() { return productName; }
+        public int quantity() { return quantity; }
+        public double unitPrice() { return unitPrice; }
+
         public double subtotal() {
             return quantity * unitPrice;
         }
     }
 
-    private record Addition(String productCode, int quantity) { }
+    // O que vai para a pilha: qual produto e quantas unidades foram adicionadas
+    private static class Addition {
+        String productCode;
+        int quantity;
+
+        Addition(String productCode, int quantity) {
+            this.productCode = productCode;
+            this.quantity = quantity;
+        }
+    }
 
     private final ProductService products;
     private final InventoryService inventory;
     private final Map<String, Line> lines = new LinkedHashMap<>();
-    private final Deque<Addition> additions = new ArrayDeque<>();
+    private final Deque<Addition> additions = new ArrayDeque<>(); // usada como pilha
 
     Cart(ProductService products, InventoryService inventory) {
-        this.products = Objects.requireNonNull(products);
-        this.inventory = Objects.requireNonNull(inventory);
+        this.products = products;
+        this.inventory = inventory;
     }
 
-    /** Inclui um produto. Recusa se o total no carrinho passar do estoque disponível. */
+    // Adiciona um produto. Não deixa passar do estoque disponível.
     public Line add(String productCode, int quantity) {
         if (quantity <= 0) {
             throw new IllegalArgumentException("A quantidade do item deve ser maior que zero.");
@@ -56,37 +80,48 @@ public final class Cart {
         return line;
     }
 
-    /** Desfaz a última inclusão (pilha). Devolve a linha afetada ou null se o carrinho estiver vazio. */
+    // Desfaz a última inclusão (topo da pilha). Devolve o que foi tirado ou null se estiver vazio.
     public Line undoLast() {
-        Addition last = additions.poll();
-        if (last == null) {
+        if (additions.isEmpty()) {
             return null;
         }
-        Line line = lines.get(last.productCode());
-        int remaining = line.quantity() - last.quantity();
-        Line undone = new Line(line.productCode(), line.productName(), last.quantity(), line.unitPrice());
+        Addition last = additions.pop();
+        Line line = lines.get(last.productCode);
+        int remaining = line.quantity() - last.quantity;
         if (remaining > 0) {
             lines.put(line.productCode(), new Line(line.productCode(), line.productName(), remaining,
                     line.unitPrice()));
         } else {
             lines.remove(line.productCode());
         }
-        return undone;
+        return new Line(line.productCode(), line.productName(), last.quantity, line.unitPrice());
     }
 
-    /** Retira todas as unidades de um produto do carrinho. */
+    // Tira todas as unidades de um produto do carrinho
     public boolean remove(String productCode) {
-        Line removed = lines.remove(productCode == null ? null : productCode.trim());
+        if (productCode == null) {
+            return false;
+        }
+        Line removed = lines.remove(productCode.trim());
         if (removed == null) {
             return false;
         }
-        additions.removeIf(a -> a.productCode().equals(removed.productCode()));
+        // tira também da pilha, para o "desfazer" não voltar nesse produto
+        Iterator<Addition> it = additions.iterator();
+        while (it.hasNext()) {
+            if (it.next().productCode.equals(removed.productCode())) {
+                it.remove();
+            }
+        }
         return true;
     }
 
     public int quantityOf(String productCode) {
         Line line = lines.get(productCode);
-        return line == null ? 0 : line.quantity();
+        if (line == null) {
+            return 0;
+        }
+        return line.quantity();
     }
 
     public List<Line> lines() {

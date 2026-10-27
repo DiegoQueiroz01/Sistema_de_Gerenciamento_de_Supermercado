@@ -11,126 +11,154 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
-/**
- * Casos de uso de estoque (E.1): entradas, saídas, histórico, alertas, itens parados e mais vendidos.
- *
- * PONTOS DE INTEGRAÇÃO COM O E.2: {@link #registerSaleExit}, {@link #hasStock} (E.2 chama o E.1)
- * e {@link SalesSource} (E.1 lê as vendas por esta interface). Este serviço não usa classes do E.2.
- */
-public final class InventoryService {
+// Operações de estoque (E.1): entradas, saídas, histórico, alertas,
+// produtos parados e mais vendidos.
+// Ligação com as vendas (E.2): registerSaleExit e hasStock são chamados pelas vendas,
+// e as vendas são lidas pela interface SalesSource.
+public class InventoryService {
 
-    /** Resultado do ranking de mais vendidos. */
-    public record TopSellingProduct(Product product, int unitsSold) { }
+    // Uma linha do ranking de mais vendidos
+    public static class TopSellingProduct {
+        private final Product product;
+        private final int unitsSold;
 
-    /** Linha de venda como o E.1 enxerga: produto e quantidade (independe das classes de venda do E.2). */
-    public record SoldItem(String productCode, int quantity) {
-        public SoldItem {
+        public TopSellingProduct(Product product, int unitsSold) {
+            this.product = product;
+            this.unitsSold = unitsSold;
+        }
+
+        public Product product() { return product; }
+        public int unitsSold() { return unitsSold; }
+    }
+
+    // Item vendido: só o código do produto e a quantidade
+    public static class SoldItem {
+        private final String productCode;
+        private final int quantity;
+
+        public SoldItem(String productCode, int quantity) {
             if (productCode == null || productCode.isBlank()) {
                 throw new IllegalArgumentException("O código do produto do item é obrigatório.");
             }
             if (quantity <= 0) {
                 throw new IllegalArgumentException("A quantidade do item deve ser maior que zero.");
             }
+            this.productCode = productCode;
+            this.quantity = quantity;
         }
+
+        public String productCode() { return productCode; }
+        public int quantity() { return quantity; }
     }
 
-    /**
-     * PONTO DE INTEGRAÇÃO (o E.1 lê, o E.2 implementa): fonte dos itens já vendidos, usada em "mais vendidos".
-     * O E.2 cria uma implementação a partir do seu repositório de vendas e a passa ao construtor.
-     */
+    // De onde vêm as vendas para montar o ranking. Quem implementa é o módulo de vendas.
     public interface SalesSource {
         List<SoldItem> findAllSoldItems();
     }
 
     private final ProductRepository products;
     private final StockMovementRepository movements;
-    private final SalesSource soldItems;
+    private final SalesSource salesSource;
 
     public InventoryService(ProductRepository products, StockMovementRepository movements,
-                            SalesSource soldItems) {
-        this.products = Objects.requireNonNull(products);
-        this.movements = Objects.requireNonNull(movements);
-        this.soldItems = Objects.requireNonNull(soldItems);
+                            SalesSource salesSource) {
+        this.products = products;
+        this.movements = movements;
+        this.salesSource = salesSource;
     }
 
-    // ----------------------------------------------------------- movimentações
+    // ---------- entradas e saídas ----------
+
     public StockMovement registerEntry(String productCode, int quantity, String responsible) {
         return registerEntry(productCode, quantity, responsible, LocalDateTime.now());
     }
 
-    public StockMovement registerEntry(String productCode, int quantity, String responsible,
-                                       LocalDateTime when) {
-        return register(requireProduct(productCode), quantity, MovementType.ENTRY, responsible, when);
+    public StockMovement registerEntry(String productCode, int quantity, String responsible, LocalDateTime when) {
+        return register(getProduct(productCode), quantity, MovementType.ENTRY, responsible, when);
     }
 
     public StockMovement registerExit(String productCode, int quantity, String responsible) {
-        return register(requireProduct(productCode), quantity, MovementType.EXIT, responsible,
-                LocalDateTime.now());
+        return register(getProduct(productCode), quantity, MovementType.EXIT, responsible, LocalDateTime.now());
     }
 
-    /** O estoque é atualizado primeiro (valida a regra); se falhar, nada é gravado no histórico. */
+    // Primeiro atualiza o estoque (que confere as regras). Se der erro, nada vai para o histórico.
     private StockMovement register(Product product, int quantity, MovementType type,
                                    String responsible, LocalDateTime when) {
         product.updateStock(quantity, type);
+        if (responsible == null || responsible.isBlank()) {
+            responsible = "-";
+        }
         StockMovement movement = new StockMovement(movements.nextId(), product.code(), quantity,
-                type, when, responsible == null || responsible.isBlank() ? "-" : responsible);
+                type, when, responsible);
         movements.save(movement);
         return movement;
     }
 
-    // ----------------------------------------------------------- integração com vendas (E.2)
+    // ---------- usado pelas vendas ----------
+
     public boolean hasStock(String productCode, int quantity) {
-        return quantity > 0 && products.findByCode(productCode)
-                .map(p -> p.quantity() >= quantity).orElse(false);
+        if (quantity <= 0) {
+            return false;
+        }
+        Product p = products.findByCode(productCode);
+        return p != null && p.quantity() >= quantity;
     }
 
-    /**
-     * Dá baixa no estoque de todos os itens de uma venda e registra uma saída por produto.
-     * Tudo ou nada: se qualquer item não tiver estoque, nada é alterado.
-     * Não grava a venda em si (responsabilidade do E.2).
-     */
+    // Dá baixa no estoque de todos os itens de uma venda.
+    // É tudo ou nada: se faltar estoque de um item, nenhum estoque é alterado.
     public void registerSaleExit(LocalDateTime saleDate, List<SoldItem> items, String responsible) {
-        Objects.requireNonNull(saleDate, "A data da venda é obrigatória.");
+        if (saleDate == null) {
+            throw new IllegalArgumentException("A data da venda é obrigatória.");
+        }
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("Uma venda precisa ter ao menos um item.");
         }
+
+        // soma as quantidades do mesmo produto
         Map<String, Integer> needed = new LinkedHashMap<>();
         for (SoldItem item : items) {
-            needed.merge(item.productCode(), item.quantity(), Integer::sum);
+            Integer current = needed.get(item.productCode());
+            if (current == null) {
+                current = 0;
+            }
+            needed.put(item.productCode(), current + item.quantity());
         }
-        for (Map.Entry<String, Integer> e : needed.entrySet()) {
-            Product p = requireProduct(e.getKey());
-            if (e.getValue() > p.quantity()) {
+
+        // primeiro confere tudo...
+        for (String code : needed.keySet()) {
+            Product p = getProduct(code);
+            int quantity = needed.get(code);
+            if (quantity > p.quantity()) {
                 throw new IllegalStateException("Quantidade indisponível em estoque para '" + p.name()
-                        + "' (solicitado: " + e.getValue() + ", máx: " + p.quantity() + ").");
+                        + "' (solicitado: " + quantity + ", máx: " + p.quantity() + ").");
             }
         }
-        for (Map.Entry<String, Integer> e : needed.entrySet()) {
-            register(requireProduct(e.getKey()), e.getValue(), MovementType.EXIT, responsible, saleDate);
+        // ...depois dá baixa
+        for (String code : needed.keySet()) {
+            register(getProduct(code), needed.get(code), MovementType.EXIT, responsible, saleDate);
         }
     }
 
-    // ----------------------------------------------------------- consultas
-    /** Histórico de um produto, da mais recente para a mais antiga. */
+    // ---------- consultas ----------
+
+    // Histórico de um produto, do mais recente para o mais antigo
     public List<StockMovement> historyOf(String productCode) {
-        List<StockMovement> list = new ArrayList<>(movements.findByProductCode(productCode));
+        List<StockMovement> list = movements.findByProductCode(productCode);
         Collections.reverse(list);
         return list;
     }
 
     public List<StockMovement> fullHistory() {
-        List<StockMovement> list = new ArrayList<>(movements.findAll());
+        List<StockMovement> list = movements.findAll();
         Collections.reverse(list);
         return list;
     }
 
-    /** Produtos abaixo do mínimo, do maior déficit para o menor. */
+    // Produtos abaixo do mínimo, do que falta mais para o que falta menos
     public List<Product> listBelowMinimum() {
         List<Product> result = new ArrayList<>();
         for (Product p : products.findAll()) {
@@ -138,14 +166,12 @@ public final class InventoryService {
                 result.add(p);
             }
         }
-        result.sort(Comparator.comparingInt((Product p) -> p.quantity() - p.minimumStock()));
+        result.sort((a, b) -> (a.quantity() - a.minimumStock()) - (b.quantity() - b.minimumStock()));
         return result;
     }
 
-    /**
-     * Produtos sem entrada/saída nos últimos {@code days} dias. Referência: última movimentação
-     * ou, se nunca houve, a data de cadastro. Os parados há mais tempo vêm primeiro.
-     */
+    // Produtos sem entrada nem saída nos últimos "days" dias.
+    // Os que estão parados há mais tempo aparecem primeiro.
     public List<Product> listWithoutMovement(int days) {
         if (days <= 0) {
             throw new IllegalArgumentException("O período deve ser de pelo menos 1 dia.");
@@ -157,10 +183,11 @@ public final class InventoryService {
                 result.add(p);
             }
         }
-        result.sort(Comparator.comparing(this::lastActivity));
+        result.sort((a, b) -> lastActivity(a).compareTo(lastActivity(b)));
         return result;
     }
 
+    // Data da última movimentação (ou a data de cadastro, se nunca houve)
     public LocalDateTime lastActivity(Product product) {
         LocalDateTime last = product.registeredAt();
         for (StockMovement m : movements.findByProductCode(product.code())) {
@@ -175,25 +202,48 @@ public final class InventoryService {
         return ChronoUnit.DAYS.between(lastActivity(product), LocalDateTime.now());
     }
 
-    /** Soma as quantidades vendidas (via SalesSource) e devolve o ranking. */
+    // Soma o que foi vendido de cada produto e devolve os "limit" primeiros
     public List<TopSellingProduct> topSelling(int limit) {
         if (limit <= 0) {
             throw new IllegalArgumentException("O limite do ranking deve ser maior que zero.");
         }
         Map<String, Integer> totals = new LinkedHashMap<>();
-        for (SoldItem item : soldItems.findAllSoldItems()) {
-            totals.merge(item.productCode(), item.quantity(), Integer::sum);
+        for (SoldItem item : salesSource.findAllSoldItems()) {
+            Integer current = totals.get(item.productCode());
+            if (current == null) {
+                current = 0;
+            }
+            totals.put(item.productCode(), current + item.quantity());
         }
+
         List<TopSellingProduct> ranking = new ArrayList<>();
-        totals.forEach((code, units) -> products.findByCode(code)
-                .ifPresent(p -> ranking.add(new TopSellingProduct(p, units))));
-        ranking.sort(Comparator.comparingInt(TopSellingProduct::unitsSold).reversed()
-                .thenComparing(t -> ProductService.normalize(t.product().name())));
-        return ranking.size() > limit ? new ArrayList<>(ranking.subList(0, limit)) : ranking;
+        for (String code : totals.keySet()) {
+            Product p = products.findByCode(code);
+            if (p != null) { // produtos desativados ficam fora do ranking
+                ranking.add(new TopSellingProduct(p, totals.get(code)));
+            }
+        }
+        // mais vendido primeiro; empate fica em ordem alfabética
+        ranking.sort((a, b) -> {
+            if (a.unitsSold() != b.unitsSold()) {
+                return b.unitsSold() - a.unitsSold();
+            }
+            return ProductService.normalize(a.product().name())
+                    .compareTo(ProductService.normalize(b.product().name()));
+        });
+
+        List<TopSellingProduct> result = new ArrayList<>();
+        for (int i = 0; i < ranking.size() && i < limit; i++) {
+            result.add(ranking.get(i));
+        }
+        return result;
     }
 
-    private Product requireProduct(String code) {
-        return products.findByCode(code)
-                .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + code));
+    private Product getProduct(String code) {
+        Product p = products.findByCode(code);
+        if (p == null) {
+            throw new IllegalArgumentException("Produto não encontrado: " + code);
+        }
+        return p;
     }
 }

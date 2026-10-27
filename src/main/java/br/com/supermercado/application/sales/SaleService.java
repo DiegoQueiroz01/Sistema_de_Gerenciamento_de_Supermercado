@@ -13,20 +13,51 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
-/**
- * Casos de uso de vendas: montar o carrinho, finalizar a venda (baixa de estoque + registro)
- * e consultar o histórico. A baixa de estoque é feita pelo InventoryService, que registra
- * uma saída por produto.
- */
-public final class SaleService {
+// Vendas: montar o carrinho, finalizar (baixa no estoque + registro) e consultar.
+public class SaleService {
 
-    /** Resumo de um conjunto de vendas (por exemplo, as do dia). */
-    public record SalesSummary(int sales, int units, double revenue) {
+    // Totais de um grupo de vendas (por exemplo, as de hoje)
+    public static class SalesSummary {
+        private final int sales;
+        private final int units;
+        private final double revenue;
+
+        public SalesSummary(int sales, int units, double revenue) {
+            this.sales = sales;
+            this.units = units;
+            this.revenue = revenue;
+        }
+
+        public int sales() { return sales; }
+        public int units() { return units; }
+        public double revenue() { return revenue; }
+
         public double averageTicket() {
-            return sales == 0 ? 0 : revenue / sales;
+            if (sales == 0) {
+                return 0;
+            }
+            return revenue / sales;
+        }
+    }
+
+    // Entrega ao estoque a lista de tudo que já foi vendido (para o ranking de mais vendidos)
+    public static class SalesHistory implements SalesSource {
+        private final SaleRepository sales;
+
+        public SalesHistory(SaleRepository sales) {
+            this.sales = sales;
+        }
+
+        @Override
+        public List<SoldItem> findAllSoldItems() {
+            List<SoldItem> items = new ArrayList<>();
+            for (Sale sale : sales.findAll()) {
+                for (SaleItem item : sale.items()) {
+                    items.add(new SoldItem(item.productCode(), item.quantity()));
+                }
+            }
+            return items;
         }
     }
 
@@ -35,40 +66,30 @@ public final class SaleService {
     private final InventoryService inventory;
 
     public SaleService(SaleRepository sales, ProductService products, InventoryService inventory) {
-        this.sales = Objects.requireNonNull(sales);
-        this.products = Objects.requireNonNull(products);
-        this.inventory = Objects.requireNonNull(inventory);
+        this.sales = sales;
+        this.products = products;
+        this.inventory = inventory;
     }
 
-    /**
-     * Fonte de itens vendidos para o ranking de mais vendidos do InventoryService.
-     * É estática porque o InventoryService precisa dela antes de o SaleService existir.
-     */
+    // O InventoryService precisa disso antes do SaleService existir, por isso é static
     public static SalesSource salesSource(SaleRepository sales) {
-        Objects.requireNonNull(sales);
-        return () -> {
-            List<SoldItem> items = new ArrayList<>();
-            for (Sale sale : sales.findAll()) {
-                for (SaleItem item : sale.items()) {
-                    items.add(new SoldItem(item.productCode(), item.quantity()));
-                }
-            }
-            return items;
-        };
+        return new SalesHistory(sales);
     }
 
     public Cart newCart() {
         return new Cart(products, inventory);
     }
 
-    /**
-     * Finaliza a venda: dá baixa no estoque (tudo ou nada) e grava a venda.
-     * Se algum item não tiver mais estoque, nada é alterado e a venda não é gravada.
-     */
+    // Finaliza a venda: baixa o estoque e grava a venda.
+    // Se faltar estoque de algum item, nada é alterado.
     public Sale finalizeSale(Cart cart, String cashier, String checkoutId, String customerTicket,
                              LocalDateTime when) {
-        Objects.requireNonNull(cart, "O carrinho é obrigatório.");
-        Objects.requireNonNull(when, "A data da venda é obrigatória.");
+        if (cart == null) {
+            throw new IllegalArgumentException("O carrinho é obrigatório.");
+        }
+        if (when == null) {
+            throw new IllegalArgumentException("A data da venda é obrigatória.");
+        }
         if (cart.isEmpty()) {
             throw new IllegalArgumentException("Uma venda precisa ter ao menos um item.");
         }
@@ -84,20 +105,23 @@ public final class SaleService {
         return sale;
     }
 
-    public Optional<Sale> findById(long id) {
+    // Devolve null se não encontrar
+    public Sale findById(long id) {
         return sales.findById(id);
     }
 
-    /** Todas as vendas, da mais recente para a mais antiga. */
+    // Da venda mais recente para a mais antiga
     public List<Sale> listAll() {
-        List<Sale> list = new ArrayList<>(sales.findAll());
+        List<Sale> list = sales.findAll();
         Collections.reverse(list);
         return list;
     }
 
-    /** Vendas de um dia, da mais recente para a mais antiga. */
+    // Vendas de um dia, da mais recente para a mais antiga
     public List<Sale> listByDate(LocalDate date) {
-        Objects.requireNonNull(date, "A data é obrigatória.");
+        if (date == null) {
+            throw new IllegalArgumentException("A data é obrigatória.");
+        }
         List<Sale> result = new ArrayList<>();
         for (Sale sale : listAll()) {
             if (sale.dateTime().toLocalDate().equals(date)) {

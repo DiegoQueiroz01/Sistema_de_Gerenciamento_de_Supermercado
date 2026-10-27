@@ -66,7 +66,7 @@ public class UserTests {
         auth.register("juliana", "Juliana Silva", "admin456", UserRole.ADMIN);
         auth.edit("admin", "Admin Antigo", UserRole.CASHIER);
         check("CU17 com outro administrador o perfil pode mudar",
-                auth.findByUsername("admin").orElseThrow().role() == UserRole.CASHIER);
+                auth.findByUsername("admin").role() == UserRole.CASHIER);
 
         check("CU18 troca de senha exige a senha atual", throwsType(IllegalArgumentException.class,
                 () -> auth.changePassword("carlos", "errada", "novaSenha")));

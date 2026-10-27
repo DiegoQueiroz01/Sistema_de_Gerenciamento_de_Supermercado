@@ -7,27 +7,26 @@ import br.com.supermercado.domain.user.UserRole;
 
 import java.time.LocalDateTime;
 
-/** Dados iniciais para usar o sistema logo ao abrir. */
-public final class DemoData {
+// Dados de exemplo carregados quando o programa abre
+public class DemoData {
     private static final int INITIAL_CHECKOUTS = 5;
     private static final int OPEN_CHECKOUTS = 3;
 
     private DemoData() {}
 
-    /** Dados cadastrais de exemplo do estabelecimento. */
     public static void loadStore(AppServices app) {
         app.store().update("Mercado Fácil", "11.222.333/0001-81",
                 "Av. Brasil, 1500 - Centro", "(11) 3333-4444");
     }
 
-    /** Usuários de exemplo, um por perfil (o administrador padrão é criado pelo AuthService). */
+    // Um usuário de cada perfil (o admin é criado pelo AuthService)
     public static void loadUsers(AppServices app) {
         app.auth().ensureDefaultAdmin();
-        app.auth().register("carlos", "Carlos Oliveira", "estoque123", UserRole.STOCKIST);
-        app.auth().register("marta", "Marta Rocha", "caixa123", UserRole.CASHIER);
+        app.auth().register("estoquista", "Carlos Oliveira", "estoque123", UserRole.STOCKIST);
+        app.auth().register("caixa", "Marta Rocha", "caixa123", UserRole.CASHIER);
     }
 
-    /** Caixas numerados de 1 a 5, com os três primeiros abertos. */
+    // Caixas de 1 a 5, com os três primeiros abertos
     public static void loadCheckouts(AppServices app) {
         for (int i = 0; i < INITIAL_CHECKOUTS; i++) {
             app.queues().createCheckout();
@@ -37,7 +36,7 @@ public final class DemoData {
         }
     }
 
-    /** Categorias e produtos com estoque inicial (apenas no modo em memória). */
+    // Categorias e produtos com estoque inicial
     public static void loadProducts(AppServices app) {
         ProductService products = app.products();
         InventoryService inventory = app.inventory();

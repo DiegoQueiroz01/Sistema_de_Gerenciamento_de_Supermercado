@@ -4,14 +4,11 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
-import java.util.Objects;
 import java.util.Scanner;
 
-/**
- * Concentra a leitura do teclado com validação: repete a pergunta até a entrada ser válida.
- * Se o teclado fechar (EOF), o Scanner lança NoSuchElementException, tratada na aplicação.
- */
-public final class InputReader {
+// Leitura do teclado. Os métodos repetem a pergunta até o usuário digitar algo válido.
+public class InputReader {
+    // STRICT faz datas como 31/02 darem erro em vez de virar outro dia
     private static final DateTimeFormatter DATE =
             DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
 
@@ -19,8 +16,8 @@ public final class InputReader {
     private final TerminalOutput out;
 
     public InputReader(Scanner scanner, TerminalOutput out) {
-        this.scanner = Objects.requireNonNull(scanner);
-        this.out = Objects.requireNonNull(out);
+        this.scanner = scanner;
+        this.out = out;
     }
 
     public String readLine(String prompt) {
@@ -31,7 +28,9 @@ public final class InputReader {
     public String readRequired(String prompt) {
         while (true) {
             String text = readLine(prompt);
-            if (!text.isEmpty()) return text;
+            if (!text.isEmpty()) {
+                return text;
+            }
             out.error("Este campo é obrigatório.");
         }
     }
@@ -41,7 +40,9 @@ public final class InputReader {
             String text = readLine(prompt);
             try {
                 int value = Integer.parseInt(text);
-                if (value >= min && value <= max) return value;
+                if (value >= min && value <= max) {
+                    return value;
+                }
                 out.error("Informe um número entre " + min + " e " + max + ".");
             } catch (NumberFormatException e) {
                 out.error("Entrada inválida: digite um número inteiro.");
@@ -49,13 +50,15 @@ public final class InputReader {
         }
     }
 
-    /** Aceita vírgula ou ponto como separador decimal; exige valor maior que zero. */
+    // Aceita vírgula ou ponto (4,20 ou 4.20). O valor tem que ser maior que zero.
     public double readPositiveDecimal(String prompt) {
         while (true) {
             String text = readLine(prompt).replace(',', '.');
             try {
                 double value = Double.parseDouble(text);
-                if (value > 0 && !Double.isInfinite(value)) return value;
+                if (value > 0 && !Double.isInfinite(value)) {
+                    return value;
+                }
                 out.error("O valor deve ser maior que zero.");
             } catch (NumberFormatException e) {
                 out.error("Entrada inválida: digite um número (ex.: 4,20).");
@@ -63,11 +66,13 @@ public final class InputReader {
         }
     }
 
-    /** Data no formato dd/mm/aaaa; vazio devolve {@code defaultDate}. */
+    // Data no formato dd/mm/aaaa. Se ficar vazio, devolve defaultDate.
     public LocalDate readDate(String prompt, LocalDate defaultDate) {
         while (true) {
             String text = readLine(prompt);
-            if (text.isEmpty() && defaultDate != null) return defaultDate;
+            if (text.isEmpty() && defaultDate != null) {
+                return defaultDate;
+            }
             try {
                 return LocalDate.parse(text, DATE);
             } catch (DateTimeParseException e) {
@@ -79,18 +84,22 @@ public final class InputReader {
     public boolean confirm(String prompt) {
         while (true) {
             String text = readLine(prompt + " (s/n): ").toLowerCase();
-            if (text.equals("s") || text.equals("sim")) return true;
-            if (text.equals("n") || text.equals("nao") || text.equals("não")) return false;
+            if (text.equals("s") || text.equals("sim")) {
+                return true;
+            }
+            if (text.equals("n") || text.equals("nao") || text.equals("não")) {
+                return false;
+            }
             out.error("Responda com 's' ou 'n'.");
         }
     }
 
-    /** Menu numerado (0 = voltar/sair); devolve a opção escolhida. */
+    // Mostra um menu numerado com "0) Voltar" e devolve a opção escolhida
     public int readMenuOption(String title, String... options) {
         return readMenuWithZeroLabel(title, "Voltar", options);
     }
 
-    /** Igual a {@link #readMenuOption}, mas com um texto próprio para a opção 0. */
+    // Igual ao readMenuOption, mas com outro texto na opção 0
     public int readMenuWithZeroLabel(String title, String zeroLabel, String... options) {
         out.title(title);
         for (int i = 0; i < options.length; i++) {

@@ -8,11 +8,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Lista em ordem de registro (histórico geral) + índice por caixa
- * (mapa de número do caixa para a lista dos seus atendimentos).
- */
-public final class InMemoryServiceRecordRepository implements ServiceRecordRepository {
+// Lista com todos os atendimentos (histórico geral) e um mapa
+// que guarda, para cada caixa, a lista dos atendimentos dele.
+public class InMemoryServiceRecordRepository implements ServiceRecordRepository {
     private final List<ServiceRecord> records = new ArrayList<>();
     private final Map<String, List<ServiceRecord>> recordsByCheckout = new HashMap<>();
     private long nextId = 1;
@@ -25,16 +23,25 @@ public final class InMemoryServiceRecordRepository implements ServiceRecordRepos
     @Override
     public void save(ServiceRecord record) {
         records.add(record);
-        recordsByCheckout.computeIfAbsent(record.checkoutId(), id -> new ArrayList<>()).add(record);
+        List<ServiceRecord> list = recordsByCheckout.get(record.checkoutId());
+        if (list == null) {
+            list = new ArrayList<>();
+            recordsByCheckout.put(record.checkoutId(), list);
+        }
+        list.add(record);
     }
 
     @Override
     public List<ServiceRecord> findAll() {
-        return List.copyOf(records);
+        return new ArrayList<>(records);
     }
 
     @Override
     public List<ServiceRecord> findByCheckoutId(String checkoutId) {
-        return List.copyOf(recordsByCheckout.getOrDefault(checkoutId, List.of()));
+        List<ServiceRecord> list = recordsByCheckout.get(checkoutId);
+        if (list == null) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(list);
     }
 }

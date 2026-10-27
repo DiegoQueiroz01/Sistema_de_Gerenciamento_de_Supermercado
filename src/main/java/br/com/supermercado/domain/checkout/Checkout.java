@@ -1,19 +1,14 @@
 package br.com.supermercado.domain.checkout;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
-/**
- * Caixa de atendimento: fila própria, cliente em atendimento e estado aberto/fechado.
- * Para fechar um caixa com clientes aguardando use QueueService.closeCheckout,
- * que redistribui os clientes antes.
- */
-public final class Checkout {
+// Caixa de atendimento: tem uma fila, pode ter um cliente sendo atendido
+// e pode estar aberto ou fechado.
+public class Checkout {
     private final String id;
     private final AttendanceQueue queue;
     private CheckoutStatus status;
-    private Customer customerInService;
+    private Customer customerInService; // null quando ninguém está sendo atendido
 
     public Checkout(String id) {
         this(id, AttendanceQueue.DEFAULT_CAPACITY);
@@ -60,8 +55,8 @@ public final class Checkout {
         return queue.snapshot();
     }
 
-    public Optional<Customer> customerInService() {
-        return Optional.ofNullable(customerInService);
+    public Customer customerInService() {
+        return customerInService;
     }
 
     public void open() {
@@ -73,12 +68,10 @@ public final class Checkout {
 
     public void close() {
         if (!queue.isEmpty()) {
-            throw new IllegalStateException(
-                    "Não é possível fechar um caixa com clientes aguardando.");
+            throw new IllegalStateException("Não é possível fechar um caixa com clientes aguardando.");
         }
         if (customerInService != null) {
-            throw new IllegalStateException(
-                    "Conclua o atendimento em andamento antes de fechar o caixa.");
+            throw new IllegalStateException("Conclua o atendimento em andamento antes de fechar o caixa.");
         }
         if (status == CheckoutStatus.CLOSED) {
             throw new IllegalStateException("O caixa já está fechado: " + id);
@@ -87,28 +80,27 @@ public final class Checkout {
     }
 
     public void enqueue(Customer customer) {
-        requireOpen();
-        queue.enqueue(Objects.requireNonNull(customer, "O cliente é obrigatório."));
+        checkOpen();
+        queue.enqueue(customer);
     }
 
-    /** Recebe cliente transferido: prioridade primeiro, depois ordem de chegada. */
     public void enqueueByArrival(Customer customer) {
-        requireOpen();
-        queue.enqueueByArrival(Objects.requireNonNull(customer, "O cliente é obrigatório."));
+        checkOpen();
+        queue.enqueueByArrival(customer);
     }
 
-    public Optional<Customer> removeNextCustomer() {
-        requireOpen();
+    public Customer removeNextCustomer() {
+        checkOpen();
         return queue.removeNext();
     }
 
-    public Optional<Customer> peekNextCustomer() {
-        requireOpen();
+    public Customer peekNextCustomer() {
+        checkOpen();
         return queue.peekNext();
     }
 
-    public Optional<Customer> removeCustomer(long customerId) {
-        requireOpen();
+    public Customer removeCustomer(long customerId) {
+        checkOpen();
         return queue.remove(customerId);
     }
 
@@ -116,29 +108,29 @@ public final class Checkout {
         return queue.contains(customerId);
     }
 
-    public Optional<Customer> findWaitingByTicket(String ticket) {
+    public Customer findWaitingByTicket(String ticket) {
         return queue.findByTicket(ticket);
     }
 
-    /** Coloca o cliente como "em atendimento" neste caixa. */
     public void startService(Customer customer) {
-        requireOpen();
-        Objects.requireNonNull(customer, "O cliente é obrigatório.");
+        checkOpen();
+        if (customer == null) {
+            throw new IllegalArgumentException("O cliente é obrigatório.");
+        }
         if (customerInService != null) {
-            throw new IllegalStateException(
-                    "Já existe um cliente em atendimento no caixa " + id + ".");
+            throw new IllegalStateException("Já existe um cliente em atendimento no caixa " + id + ".");
         }
         customerInService = customer;
     }
 
-    /** Conclui o atendimento em andamento; devolve o cliente atendido, se houver. */
-    public Optional<Customer> finishService() {
+    // Termina o atendimento atual e devolve o cliente que estava sendo atendido (ou null)
+    public Customer finishService() {
         Customer finished = customerInService;
         customerInService = null;
-        return Optional.ofNullable(finished);
+        return finished;
     }
 
-    private void requireOpen() {
+    private void checkOpen() {
         if (status != CheckoutStatus.OPEN) {
             throw new IllegalStateException("O caixa não está aberto: " + id);
         }

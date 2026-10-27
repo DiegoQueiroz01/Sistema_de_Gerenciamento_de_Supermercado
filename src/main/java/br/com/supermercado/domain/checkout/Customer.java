@@ -1,37 +1,58 @@
 package br.com.supermercado.domain.checkout;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
 
-/**
- * Cliente em espera. A senha (ticket) é sequencial e formatada, por exemplo "S001".
- */
-public record Customer(long id, String ticket, String name, boolean priority,
-                       LocalDateTime arrivalTime) {
+// Cliente esperando na fila. A senha (ticket) segue o formato S001, S002...
+public class Customer {
     public static final String DEFAULT_NAME = "Cliente";
 
-    public Customer {
+    private final long id;
+    private final String ticket;
+    private final String name;
+    private final boolean priority;
+    private final LocalDateTime arrivalTime;
+
+    public Customer(long id, String ticket, String name, boolean priority, LocalDateTime arrivalTime) {
         if (id <= 0) {
             throw new IllegalArgumentException("O identificador do cliente deve ser positivo.");
         }
         if (ticket == null || ticket.isBlank()) {
             throw new IllegalArgumentException("A senha do cliente é obrigatória.");
         }
-        name = (name == null || name.isBlank()) ? DEFAULT_NAME : name.trim();
-        Objects.requireNonNull(arrivalTime, "O horário de chegada é obrigatório.");
+        if (arrivalTime == null) {
+            throw new IllegalArgumentException("O horário de chegada é obrigatório.");
+        }
+        this.id = id;
+        this.ticket = ticket;
+        if (name == null || name.isBlank()) {
+            this.name = DEFAULT_NAME;
+        } else {
+            this.name = name.trim();
+        }
+        this.priority = priority;
+        this.arrivalTime = arrivalTime;
     }
 
     public Customer(long id, boolean priority, LocalDateTime arrivalTime) {
         this(id, formatTicket(id), DEFAULT_NAME, priority, arrivalTime);
     }
 
-    /** Gera a senha no formato "S" + número com pelo menos três dígitos (S001, S042, S1000). */
     public static String formatTicket(long sequence) {
         return String.format("S%03d", sequence);
     }
 
+    public long id() { return id; }
+    public String ticket() { return ticket; }
+    public String name() { return name; }
+    public boolean priority() { return priority; }
+    public LocalDateTime arrivalTime() { return arrivalTime; }
+
     @Override
     public String toString() {
-        return ticket + " " + name + (priority ? " [PRIO]" : "");
+        String text = ticket + " " + name;
+        if (priority) {
+            text += " [PRIO]";
+        }
+        return text;
     }
 }

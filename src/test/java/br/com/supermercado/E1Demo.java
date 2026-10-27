@@ -35,11 +35,25 @@ public final class E1Demo {
         void add(List<SoldItem> sold) { items.addAll(sold); }
 
         @Override
-        public List<SoldItem> findAllSoldItems() { return List.copyOf(items); }
+        public List<SoldItem> findAllSoldItems() { return new ArrayList<>(items); }
     }
 
-    /** Conjunto de serviços já ligados e preenchidos com dados de demonstração. */
-    record Setup(ProductService products, InventoryService inventory, FakeSales sales) { }
+    // Serviços já ligados e preenchidos com dados de demonstração
+    static class Setup {
+        private final ProductService products;
+        private final InventoryService inventory;
+        private final FakeSales sales;
+
+        Setup(ProductService products, InventoryService inventory, FakeSales sales) {
+            this.products = products;
+            this.inventory = inventory;
+            this.sales = sales;
+        }
+
+        ProductService products() { return products; }
+        InventoryService inventory() { return inventory; }
+        FakeSales sales() { return sales; }
+    }
 
     static Setup createSeededSetup() {
         InMemoryProductRepository productRepository = new InMemoryProductRepository();

@@ -7,90 +7,101 @@ import br.com.supermercado.repositories.ProductRepository;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
-/** Casos de uso de produtos e categorias (E.1). Não depende de menus. */
-public final class ProductService {
+// Operações de produtos e categorias (E.1)
+public class ProductService {
 
-    /** Critérios de ordenação exigidos: nome, preço ou quantidade (via Comparator). */
+    // Formas de ordenar a lista de produtos
     public enum SortCriterion {
-        NAME(Comparator.comparing((Product p) -> normalize(p.name()))),
-        PRICE(Comparator.comparingDouble(Product::price)),
-        QUANTITY(Comparator.comparingInt(Product::quantity));
-
-        private final Comparator<Product> comparator;
-
-        SortCriterion(Comparator<Product> comparator) {
-            this.comparator = comparator;
-        }
-
-        public Comparator<Product> comparator() {
-            return comparator;
-        }
+        NAME, PRICE, QUANTITY
     }
 
     private final ProductRepository products;
 
     public ProductService(ProductRepository products) {
-        this.products = Objects.requireNonNull(products);
+        this.products = products;
     }
 
-    /** Remove acentos e converte para minúsculas (buscas e ordenação por nome). */
+    // Tira os acentos e deixa em minúsculas, para buscar "ype" e achar "Ypê"
     public static String normalize(String text) {
-        return Normalizer.normalize(text == null ? "" : text.trim(), Normalizer.Form.NFD)
-                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "").toLowerCase();
+        if (text == null) {
+            text = "";
+        }
+        String withoutAccents = Normalizer.normalize(text.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        return withoutAccents.toLowerCase();
     }
 
-    // ----------------------------------------------------------- categorias
+    // ---------- categorias ----------
+
     public Category registerCategory(String name) {
         Category category = new Category(name);
-        if (findCategory(category.name()).isPresent()) {
+        if (findCategory(category.name()) != null) {
             throw new IllegalStateException("Já existe a categoria '" + category.name() + "'.");
         }
         products.saveCategory(category);
         return category;
     }
 
-    public Optional<Category> findCategory(String name) {
+    // Devolve null se não encontrar
+    public Category findCategory(String name) {
         String key = normalize(name);
-        return products.findAllCategories().stream()
-                .filter(c -> normalize(c.name()).equals(key)).findFirst();
+        for (Category c : products.findAllCategories()) {
+            if (normalize(c.name()).equals(key)) {
+                return c;
+            }
+        }
+        return null;
     }
 
     public List<Category> listCategories() {
-        List<Category> list = new ArrayList<>(products.findAllCategories());
-        list.sort(Comparator.comparing(c -> normalize(c.name())));
+        List<Category> list = products.findAllCategories();
+        list.sort((a, b) -> normalize(a.name()).compareTo(normalize(b.name())));
         return list;
     }
 
-    // ----------------------------------------------------------- produtos
-    /** Cadastra produto sem estoque (o estoque inicial é uma ENTRY feita pelo InventoryService). */
+    // ---------- produtos ----------
+
+    // O produto é cadastrado com estoque zero; o estoque inicial entra depois como ENTRADA
     public Product registerProduct(String code, String name, Category category, double price,
                                    int minimumStock, LocalDateTime registeredAt) {
         Product product = new Product(code, name, category, price, minimumStock, registeredAt);
         if (products.existsByCode(product.code())) {
             throw new IllegalStateException("Código já cadastrado no sistema: " + product.code());
         }
-        if (!products.findAllCategories().contains(category)) {
+        if (!isRegistered(category)) {
             throw new IllegalArgumentException("A categoria do produto não está cadastrada.");
         }
         products.save(product);
         return product;
     }
 
-    public Optional<Product> findByCode(String code) {
+    private boolean isRegistered(Category category) {
+        for (Category c : products.findAllCategories()) {
+            if (c.name().equals(category.name())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Devolve null se não encontrar
+    public Product findByCode(String code) {
         return products.findByCode(code);
     }
 
+    // Igual ao findByCode, mas dá erro se não encontrar
     public Product requireByCode(String code) {
-        return products.findByCode(code)
-                .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + code));
+        Product p = products.findByCode(code);
+        if (p == null) {
+            throw new IllegalArgumentException("Produto não encontrado: " + code);
+        }
+        return p;
     }
 
-    /** Busca por parte do nome, ignorando maiúsculas e acentos. */
+    // Busca por parte do nome, sem ligar para acentos e maiúsculas
     public List<Product> searchByName(String name) {
         String key = normalize(name);
         List<Product> result = new ArrayList<>();
@@ -105,7 +116,7 @@ public final class ProductService {
     public List<Product> filterByCategory(Category category) {
         List<Product> result = new ArrayList<>();
         for (Product p : products.findAll()) {
-            if (p.category().equals(category)) {
+            if (p.category().name().equals(category.name())) {
                 result.add(p);
             }
         }
@@ -113,10 +124,22 @@ public final class ProductService {
     }
 
     public List<Product> listSorted(SortCriterion criterion, boolean descending) {
-        List<Product> copy = new ArrayList<>(products.findAll());
-        Comparator<Product> comparator = criterion.comparator();
-        copy.sort(descending ? comparator.reversed() : comparator);
-        return copy;
+        List<Product> list = products.findAll();
+        switch (criterion) {
+            case NAME:
+                list.sort((a, b) -> normalize(a.name()).compareTo(normalize(b.name())));
+                break;
+            case PRICE:
+                list.sort((a, b) -> Double.compare(a.price(), b.price()));
+                break;
+            case QUANTITY:
+                list.sort((a, b) -> Integer.compare(a.quantity(), b.quantity()));
+                break;
+        }
+        if (descending) {
+            Collections.reverse(list);
+        }
+        return list;
     }
 
     public List<Product> listAll() {
@@ -129,11 +152,8 @@ public final class ProductService {
         products.save(product);
     }
 
-    /**
-     * Desativa o produto: ele sai das consultas e não pode mais ser vendido, mas o histórico
-     * de movimentações e vendas é mantido. Só é permitido com estoque zerado, para que nenhum
-     * saldo "suma" sem uma saída registrada.
-     */
+    // Desativa o produto: ele some das consultas e das vendas, mas o histórico continua.
+    // Só pode desativar com estoque zerado, para nenhum saldo sumir sem uma saída registrada.
     public Product deactivate(String code) {
         Product product = requireByCode(code);
         if (product.quantity() > 0) {

@@ -11,6 +11,7 @@ import br.com.supermercado.infrastructure.memory.InMemoryServiceRecordRepository
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -32,7 +33,11 @@ public class E2Tests {
     }
 
     static List<String> tickets(Checkout checkout) {
-        return checkout.waitingCustomers().stream().map(Customer::ticket).toList();
+        List<String> result = new ArrayList<>();
+        for (Customer c : checkout.waitingCustomers()) {
+            result.add(c.ticket());
+        }
+        return result;
     }
 
     static int run() {
@@ -65,7 +70,7 @@ public class E2Tests {
         q.openCheckout("2");
         check("CF07 novo cliente vai para a menor fila", q.registerArrival("Daniel", false, t0.plusMinutes(4))
                 .checkoutId().equals("2"));
-        check("CF08 menor fila consultável", q.shortestOpenCheckout().orElseThrow().id().equals("2"));
+        check("CF08 menor fila consultável", q.shortestOpenCheckout().id().equals("2"));
 
         // Transferência pela senha
         q.transferCustomer("s002", "1", "2");
@@ -75,15 +80,15 @@ public class E2Tests {
                 () -> q.transferCustomer("S999", "1", "2")));
 
         // Atendimento
-        ServiceRecord r1 = q.startNextAttendance("1", t0.plusMinutes(10)).orElseThrow();
+        ServiceRecord r1 = q.startNextAttendance("1", t0.plusMinutes(10));
         check("CF11 atende primeiro o prioritário", r1.customer().ticket().equals("S003")
-                && c1.customerInService().orElseThrow().equals(carla));
+                && c1.customerInService() == carla);
         check("CF12 espera calculada (8 min)", r1.calculateWaitTime().equals(Duration.ofMinutes(8)));
         q.startNextAttendance("1", t0.plusMinutes(12));
         check("CF13 chamar o próximo conclui o atendimento anterior",
-                c1.customerInService().orElseThrow().equals(ana));
-        check("CF14 concluir atendimento libera o caixa", q.finishAttendance("1").isPresent()
-                && c1.customerInService().isEmpty());
+                c1.customerInService() == ana);
+        check("CF14 concluir atendimento libera o caixa", q.finishAttendance("1") != null
+                && c1.customerInService() == null);
         check("CF15 histórico por caixa", q.serviceRecordsOf("1").size() == 2 && q.serviceRecordsOf("2").isEmpty());
 
         // Painel
@@ -91,7 +96,7 @@ public class E2Tests {
         check("CF16 painel: totais", o.totalCheckouts() == 2 && o.openCheckouts() == 2
                 && o.waitingCustomers() == 3 && o.totalAttendances() == 2);
         check("CF17 painel: espera média e caixa mais movimentado",
-                o.averageWait().equals(Duration.ofMinutes(10)) && o.busiestCheckoutId().orElseThrow().equals("1"));
+                o.averageWait().equals(Duration.ofMinutes(10)) && "1".equals(o.busiestCheckoutId()));
 
         // Fechamento
         q.startNextAttendance("1", t0.plusMinutes(13));
@@ -99,13 +104,13 @@ public class E2Tests {
                 .checkoutId().equals("1"));
         q.closeCheckout("1");
         check("CF19 fechar caixa conclui atendimento e redistribui", !c1.isOpen()
-                && c1.customerInService().isEmpty() && tickets(c2).equals(List.of("S002", "S005", "S006")));
+                && c1.customerInService() == null && tickets(c2).equals(List.of("S002", "S005", "S006")));
         check("CF20 fechar o último caixa com fila recusado", throwsType(IllegalStateException.class,
                 () -> q.closeCheckout("2")));
         check("CF21 remover caixa aberto recusado", throwsType(IllegalStateException.class,
                 () -> q.removeCheckout("2")));
         q.removeCheckout("1");
-        check("CF22 remover caixa fechado", q.checkout("1").isEmpty());
+        check("CF22 remover caixa fechado", q.checkout("1") == null);
 
         // Capacidade
         QueueService small = new QueueService(1);
@@ -118,10 +123,10 @@ public class E2Tests {
         check("CF23 sem vaga em nenhuma fila recusa chegada", throwsType(IllegalStateException.class,
                 () -> small.registerArrival("C", false, t0)));
         check("CF24 fechar sem espaço nos outros caixas recusado", throwsType(IllegalStateException.class,
-                () -> small.closeCheckout("1")) && small.checkout("1").orElseThrow().waitingCount() == 1);
+                () -> small.closeCheckout("1")) && small.checkout("1").waitingCount() == 1);
         check("CF25 transferência para fila cheia não perde o cliente", throwsType(IllegalStateException.class,
                 () -> small.transferCustomer("S001", "1", "2"))
-                && small.checkout("1").orElseThrow().waitingCount() == 1);
+                && small.checkout("1").waitingCount() == 1);
 
         // Prioritário na transferência e no fechamento
         QueueService p = new QueueService();
@@ -152,15 +157,15 @@ public class E2Tests {
         r.createCheckout();
         r.openCheckout(" 7 ");
         check("CF29 caixas gravados no repositório em ordem de criação",
-                checkoutRepo.findAll().stream().map(Checkout::id).toList().equals(List.of("1", "7")));
+                checkoutRepo.findAll().get(0).id().equals("1") && checkoutRepo.findAll().get(1).id().equals("7"));
         r.registerArrival("Ana", false, t0);
         r.startNextAttendance("7", t0.plusMinutes(1));
         check("CF30 atendimento gravado no repositório e indexado por caixa",
                 recordRepo.findAll().size() == 1 && recordRepo.findByCheckoutId("7").size() == 1
                         && recordRepo.findByCheckoutId("1").isEmpty());
         r.removeCheckout("1");
-        check("CF31 remoção apaga o caixa do repositório", checkoutRepo.findById("1").isEmpty()
-                && checkoutRepo.findById("7").isPresent());
+        check("CF31 remoção apaga o caixa do repositório", checkoutRepo.findById("1") == null
+                && checkoutRepo.findById("7") != null);
 
         System.out.println("\nResultado: " + passed + " passaram, " + failed + " falharam.");
         return failed;

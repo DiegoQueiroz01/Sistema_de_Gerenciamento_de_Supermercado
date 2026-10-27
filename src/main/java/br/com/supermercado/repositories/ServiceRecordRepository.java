@@ -9,7 +9,7 @@ public interface ServiceRecordRepository {
 
     void save(ServiceRecord record);
 
-    /** Todos os atendimentos, em ordem de registro (mais antigo primeiro). */
+    // Atendimentos na ordem em que foram registrados (mais antigo primeiro)
     List<ServiceRecord> findAll();
 
     List<ServiceRecord> findByCheckoutId(String checkoutId);

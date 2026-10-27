@@ -85,7 +85,7 @@ public class SalesTests {
         c1.add("F", 2);
         Sale s1 = sales.finalizeSale(c1, "Marta", "1", "S004", now);
         check("CV13 venda grava itens, total e senha", s1.id() == 1 && s1.items().size() == 2
-                && s1.total() == 3 * 25.0 + 2 * 8.0 && s1.customerTicket().orElse("").equals("S004"));
+                && s1.total() == 3 * 25.0 + 2 * 8.0 && "S004".equals(s1.customerTicket()));
         check("CV14 venda baixa o estoque", products.requireByCode("A").quantity() == 7
                 && products.requireByCode("F").quantity() == 3);
         List<StockMovement> history = inventory.historyOf("A");
@@ -104,7 +104,7 @@ public class SalesTests {
 
         // Preço do cupom não muda com edição do produto
         products.edit("A", "Arroz 5kg", grocery, 30.0, 2);
-        check("CV18 cupom mantém o preço da venda", sales.findById(1).orElseThrow().items().get(0).unitPrice() == 25.0);
+        check("CV18 cupom mantém o preço da venda", sales.findById(1).items().get(0).unitPrice() == 25.0);
 
         // Consultas e ranking
         Cart c3 = sales.newCart();
@@ -120,7 +120,7 @@ public class SalesTests {
         check("CV22 mais vendidos usa as vendas reais", top.size() == 2
                 && top.get(0).product().code().equals("A") && top.get(0).unitsSold() == 3
                 && top.get(1).unitsSold() == 3);
-        check("CV23 venda inexistente", sales.findById(99).isEmpty());
+        check("CV23 venda inexistente", sales.findById(99) == null);
 
         System.out.println("\nResultado: " + passed + " passaram, " + failed + " falharam.");
         return failed;

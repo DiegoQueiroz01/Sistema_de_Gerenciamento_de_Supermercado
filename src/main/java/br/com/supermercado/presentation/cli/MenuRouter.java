@@ -2,9 +2,10 @@ package br.com.supermercado.presentation.cli;
 
 import br.com.supermercado.AppServices;
 import br.com.supermercado.domain.user.User;
+import br.com.supermercado.domain.user.UserRole;
 
-/** Abre o menu correspondente ao perfil do usuário autenticado. */
-public final class MenuRouter {
+// Abre o menu certo de acordo com o perfil do usuário que fez login
+public class MenuRouter {
     private final AppServices app;
     private final InputReader in;
     private final TerminalOutput out;
@@ -15,12 +16,14 @@ public final class MenuRouter {
         this.out = out;
     }
 
-    /** Volta quando o usuário sai (logout). */
+    // Só volta quando o usuário escolhe sair (logout)
     public void open(User user) {
-        switch (user.role()) {
-            case ADMIN -> new AdminMenu(app, in, out, user).run();
-            case STOCKIST -> stockistHome(user);
-            case CASHIER -> cashierHome(user);
+        if (user.role() == UserRole.ADMIN) {
+            new AdminMenu(app, in, out, user).run();
+        } else if (user.role() == UserRole.STOCKIST) {
+            stockistHome(user);
+        } else if (user.role() == UserRole.CASHIER) {
+            cashierHome(user);
         }
     }
 
@@ -29,10 +32,10 @@ public final class MenuRouter {
         do {
             option = in.readMenuWithZeroLabel("ESTOQUISTA - " + user.name(), "Sair (logout)",
                     "Produtos e estoque", "Alterar minha senha");
-            switch (option) {
-                case 1 -> new StockistMenu(in, out, app.products(), app.inventory(), user.name()).run();
-                case 2 -> UserAdminMenu.changeOwnPassword(in, out, app.auth(), user);
-                default -> { }
+            if (option == 1) {
+                new StockistMenu(in, out, app.products(), app.inventory(), user.name()).run();
+            } else if (option == 2) {
+                UserAdminMenu.changeOwnPassword(in, out, app.auth(), user);
             }
         } while (option != 0);
     }
@@ -42,12 +45,12 @@ public final class MenuRouter {
         do {
             option = in.readMenuWithZeroLabel("OPERADOR DE CAIXA - " + user.name(), "Sair (logout)",
                     "Vendas", "Caixas e filas (atendimento)", "Alterar minha senha");
-            switch (option) {
-                case 1 -> new CashierMenu(in, out, app.sales(), app.products(), app.queues(), app.store(),
-                        user.name()).run();
-                case 2 -> new QueueMenu(in, out, app.queues(), app.dashboard()).run();
-                case 3 -> UserAdminMenu.changeOwnPassword(in, out, app.auth(), user);
-                default -> { }
+            if (option == 1) {
+                new CashierMenu(in, out, app.sales(), app.products(), app.queues(), app.store(), user.name()).run();
+            } else if (option == 2) {
+                new QueueMenu(in, out, app.queues(), app.dashboard()).run();
+            } else if (option == 3) {
+                UserAdminMenu.changeOwnPassword(in, out, app.auth(), user);
             }
         } while (option != 0);
     }

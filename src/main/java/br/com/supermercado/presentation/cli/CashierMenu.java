@@ -13,14 +13,10 @@ import br.com.supermercado.domain.sales.Sale;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
-/**
- * Menu do OPERADOR DE CAIXA: registrar vendas (carrinho, cupom) e consultar as vendas.
- * A venda pode ser ligada a um caixa; se houver cliente em atendimento nele, a senha
- * do cliente fica registrada no cupom.
- */
-public final class CashierMenu {
+// Menu de VENDAS do operador de caixa: carrinho, cupom e consulta de vendas.
+// Se a venda for feita num caixa com cliente em atendimento, a senha dele vai no cupom.
+public class CashierMenu {
     private final InputReader in;
     private final TerminalOutput out;
     private final SaleService sales;
@@ -47,10 +43,15 @@ public final class CashierMenu {
                     "Vendas de hoje", "Consultar venda pelo número");
             try {
                 switch (option) {
-                    case 1 -> newSale();
-                    case 2 -> todaySales();
-                    case 3 -> showSale();
-                    default -> { }
+                    case 1:
+                        newSale();
+                        break;
+                    case 2:
+                        todaySales();
+                        break;
+                    case 3:
+                        showSale();
+                        break;
                 }
             } catch (IllegalArgumentException | IllegalStateException e) {
                 out.error(e.getMessage());
@@ -64,38 +65,50 @@ public final class CashierMenu {
         String ticket = null;
         String typed = in.readLine("Número do caixa (vazio = sem caixa): ");
         if (!typed.isEmpty()) {
-            Checkout checkout = queues.checkout(typed)
-                    .orElseThrow(() -> new IllegalArgumentException("Caixa não encontrado: " + typed));
+            Checkout checkout = queues.checkout(typed);
+            if (checkout == null) {
+                out.error("Caixa não encontrado: " + typed);
+                return;
+            }
             checkoutId = checkout.id();
-            Optional<Customer> inService = checkout.customerInService();
-            if (inService.isPresent()) {
-                ticket = inService.get().ticket();
-                out.println("  Cliente em atendimento: " + inService.get());
+            Customer inService = checkout.customerInService();
+            if (inService != null) {
+                ticket = inService.ticket();
+                out.println("  Cliente em atendimento: " + inService);
             } else {
                 out.warning("Nenhum cliente em atendimento no caixa " + checkoutId + ".");
             }
         }
 
         Cart cart = sales.newCart();
-        while (true) {
+        boolean finished = false;
+        while (!finished) {
             int option = in.readMenuWithZeroLabel("CARRINHO - " + TerminalOutput.money(cart.total()),
                     "Cancelar venda", "Adicionar item", "Desfazer último item",
                     "Remover produto do carrinho", "Ver carrinho", "Finalizar venda");
             try {
                 switch (option) {
-                    case 1 -> addItem(cart);
-                    case 2 -> undoLast(cart);
-                    case 3 -> removeProduct(cart);
-                    case 4 -> showCart(cart);
-                    case 5 -> {
-                        if (finalizeSale(cart, checkoutId, ticket)) return;
-                    }
-                    default -> {
+                    case 1:
+                        addItem(cart);
+                        break;
+                    case 2:
+                        undoLast(cart);
+                        break;
+                    case 3:
+                        removeProduct(cart);
+                        break;
+                    case 4:
+                        showCart(cart);
+                        break;
+                    case 5:
+                        finished = finalizeSale(cart, checkoutId, ticket);
+                        break;
+                    default: // 0 = cancelar
                         if (cart.isEmpty() || in.confirm("Descartar o carrinho e cancelar a venda?")) {
                             out.warning("Venda cancelada. O estoque não foi alterado.");
-                            return;
+                            finished = true;
                         }
-                    }
+                        break;
                 }
             } catch (IllegalArgumentException | IllegalStateException e) {
                 out.error(e.getMessage());
@@ -105,7 +118,9 @@ public final class CashierMenu {
 
     private void addItem(Cart cart) {
         Product p = selector.select("Código ou nome do produto: ");
-        if (p == null) return;
+        if (p == null) {
+            return;
+        }
         int available = p.quantity() - cart.quantityOf(p.code());
         if (available <= 0) {
             out.error("Sem estoque disponível para '" + p.name() + "'.");
@@ -134,7 +149,9 @@ public final class CashierMenu {
         }
         out.println(SaleViews.cart(cart));
         int n = in.readInt("Número do item a remover (0 = cancelar): ", 0, lines.size());
-        if (n == 0) return;
+        if (n == 0) {
+            return;
+        }
         Cart.Line line = lines.get(n - 1);
         cart.remove(line.productCode());
         out.success("Removido do carrinho: " + line.productName());
@@ -145,6 +162,7 @@ public final class CashierMenu {
         out.println(SaleViews.cart(cart));
     }
 
+    // Devolve true se a venda foi registrada
     private boolean finalizeSale(Cart cart, String checkoutId, String ticket) {
         if (cart.isEmpty()) {
             out.error("Adicione ao menos um item antes de finalizar.");
@@ -169,8 +187,11 @@ public final class CashierMenu {
 
     private void showSale() {
         long id = in.readInt("Número da venda: ", 1, Integer.MAX_VALUE);
-        Sale sale = sales.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Venda não encontrada: " + id));
+        Sale sale = sales.findById(id);
+        if (sale == null) {
+            out.error("Venda não encontrada: " + id);
+            return;
+        }
         out.blank();
         out.println(SaleViews.receipt(sale, store.receiptHeader()));
     }

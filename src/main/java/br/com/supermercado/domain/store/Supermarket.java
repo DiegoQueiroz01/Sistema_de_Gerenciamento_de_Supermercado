@@ -1,53 +1,83 @@
 package br.com.supermercado.domain.store;
 
-/**
- * Dados cadastrais do estabelecimento, exibidos no cabeçalho do sistema e no cupom.
- * O CNPJ é opcional, mas, se informado, precisa ser válido (dígitos verificadores).
- */
-public record Supermarket(String name, String cnpj, String address, String phone) {
+// Dados do supermercado (aparecem no cabeçalho e no cupom).
+// O CNPJ é opcional, mas se for informado precisa ser válido.
+public class Supermarket {
+    private final String name;
+    private final String cnpj; // só os números
+    private final String address;
+    private final String phone;
 
-    public Supermarket {
+    public Supermarket(String name, String cnpj, String address, String phone) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("O nome do supermercado não pode ser vazio.");
         }
-        name = name.trim();
-        cnpj = normalizeCnpj(cnpj);
-        address = address == null ? "" : address.trim();
-        phone = phone == null ? "" : phone.trim();
+        this.name = name.trim();
+        this.cnpj = onlyDigits(cnpj);
+        this.address = address == null ? "" : address.trim();
+        this.phone = phone == null ? "" : phone.trim();
     }
 
-    /** Guarda o CNPJ só com números; vazio é aceito. */
-    private static String normalizeCnpj(String cnpj) {
-        String digits = cnpj == null ? "" : cnpj.replaceAll("\\D", "");
+    private static String onlyDigits(String cnpj) {
+        if (cnpj == null) {
+            return "";
+        }
+        String digits = cnpj.replaceAll("[^0-9]", "");
         if (!digits.isEmpty() && !isValidCnpj(digits)) {
             throw new IllegalArgumentException("CNPJ inválido: " + cnpj.trim());
         }
         return digits;
     }
 
-    /** Valida os 14 dígitos e os dois dígitos verificadores do CNPJ. */
+    // Confere se tem 14 números e se os dois dígitos verificadores estão certos
     public static boolean isValidCnpj(String digits) {
-        if (digits == null || !digits.matches("\\d{14}") || digits.chars().distinct().count() == 1) {
+        if (digits == null || !digits.matches("[0-9]{14}")) {
             return false;
         }
-        return checkDigit(digits, 12) == digits.charAt(12) - '0'
-                && checkDigit(digits, 13) == digits.charAt(13) - '0';
+        // CNPJ com todos os números iguais (ex.: 11111111111111) é inválido
+        boolean allEqual = true;
+        for (int i = 1; i < digits.length(); i++) {
+            if (digits.charAt(i) != digits.charAt(0)) {
+                allEqual = false;
+            }
+        }
+        if (allEqual) {
+            return false;
+        }
+        int first = checkDigit(digits, 12);
+        int second = checkDigit(digits, 13);
+        return first == digits.charAt(12) - '0' && second == digits.charAt(13) - '0';
     }
 
+    // Calcula um dígito verificador usando os primeiros "length" números.
+    // Os pesos vão diminuindo até 2 e depois voltam para 9.
     private static int checkDigit(String digits, int length) {
         int sum = 0;
-        int weight = length - 7; // 5 para o 1º dígito, 6 para o 2º; os pesos vão de 2 a 9 e recomeçam
+        int weight = length - 7; // 5 para o 1º dígito e 6 para o 2º
         for (int i = 0; i < length; i++) {
             sum += (digits.charAt(i) - '0') * weight;
-            weight = weight == 2 ? 9 : weight - 1;
+            weight--;
+            if (weight < 2) {
+                weight = 9;
+            }
         }
         int rest = sum % 11;
-        return rest < 2 ? 0 : 11 - rest;
+        if (rest < 2) {
+            return 0;
+        }
+        return 11 - rest;
     }
 
-    /** CNPJ no formato 00.000.000/0000-00 (ou "-" se não informado). */
+    public String name() { return name; }
+    public String cnpj() { return cnpj; }
+    public String address() { return address; }
+    public String phone() { return phone; }
+
+    // CNPJ no formato 00.000.000/0000-00
     public String formattedCnpj() {
-        if (cnpj.isEmpty()) return "-";
+        if (cnpj.isEmpty()) {
+            return "-";
+        }
         return cnpj.substring(0, 2) + "." + cnpj.substring(2, 5) + "." + cnpj.substring(5, 8) + "/"
                 + cnpj.substring(8, 12) + "-" + cnpj.substring(12);
     }

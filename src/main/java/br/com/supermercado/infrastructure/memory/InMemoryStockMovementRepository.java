@@ -6,8 +6,8 @@ import br.com.supermercado.repositories.StockMovementRepository;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Lista em ordem de registro (histórico). */
-public final class InMemoryStockMovementRepository implements StockMovementRepository {
+// Lista com as movimentações na ordem de registro (histórico)
+public class InMemoryStockMovementRepository implements StockMovementRepository {
     private final List<StockMovement> movements = new ArrayList<>();
     private long nextId = 1;
 
@@ -23,7 +23,7 @@ public final class InMemoryStockMovementRepository implements StockMovementRepos
 
     @Override
     public List<StockMovement> findAll() {
-        return List.copyOf(movements);
+        return new ArrayList<>(movements);
     }
 
     @Override

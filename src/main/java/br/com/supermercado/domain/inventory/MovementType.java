@@ -1,6 +1,6 @@
 package br.com.supermercado.domain.inventory;
 
-/** Classificação de uma movimentação de estoque. */
+// ENTRY = entrada de estoque, EXIT = saída
 public enum MovementType {
     ENTRY, EXIT
 }

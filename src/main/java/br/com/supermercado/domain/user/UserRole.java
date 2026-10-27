@@ -1,6 +1,6 @@
 package br.com.supermercado.domain.user;
 
-/** Perfis de acesso. Cada perfil abre um menu diferente no terminal. */
+// Perfis de acesso. Cada um abre um menu diferente.
 public enum UserRole {
     ADMIN("Administrador"),
     STOCKIST("Estoquista"),

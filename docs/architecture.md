@@ -6,17 +6,15 @@
 - Uso exclusivamente pelo terminal; não há telas gráficas, navegador ou frontend.
 - Separação entre apresentação, casos de uso, domínio, contratos de dados e
   infraestrutura.
-- Os dados ficam em estruturas de dados em memória. O MySQL é opcional e cobre
-  apenas produtos, categorias e movimentações de estoque.
+- Não há banco de dados: os dados ficam em estruturas de dados em memória.
 
 ## Estrutura
 
 ```text
 .
 ├── docs/architecture.md
-├── sql/                         scripts do MySQL (opcional)
 ├── src/main/java/br/com/supermercado/
-│   ├── Main.java                ponto de entrada (memória ou --mysql)
+│   ├── Main.java                ponto de entrada
 │   ├── AppServices.java         liga serviços e repositórios
 │   ├── DemoData.java            dados iniciais (produtos, usuários, caixas)
 │   ├── application/
@@ -36,8 +34,7 @@
 │   │   └── user/{User, UserRole}.java
 │   ├── repositories/            contratos de acesso aos dados
 │   ├── infrastructure/
-│   │   ├── memory/              implementações em memória (estruturas de dados)
-│   │   └── mysql/               produtos e estoque no MySQL
+│   │   └── memory/              implementações em memória (estruturas de dados)
 │   └── presentation/cli/
 │       ├── CliApplication.java  tela inicial e login
 │       ├── MenuRouter.java      abre o menu do perfil
@@ -109,10 +106,6 @@ implementações em `infrastructure/memory` usam:
 | `InMemorySaleRepository` | lista em ordem de registro + mapa por número da venda |
 | `InMemoryServiceRecordRepository` | lista em ordem de registro + mapa por caixa |
 | `Cart` | mapa ordenado por código + pilha de inclusões (desfazer) |
-
-Com `--mysql`, `MySQLProductRepository` e `MySQLStockMovementRepository`
-substituem os repositórios de produtos e movimentações; o saldo de cada produto
-é recalculado somando entradas e subtraindo saídas do histórico.
 
 ## Regras contempladas
 

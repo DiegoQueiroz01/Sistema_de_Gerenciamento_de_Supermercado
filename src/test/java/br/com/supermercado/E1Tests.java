@@ -35,7 +35,7 @@ public class E1Tests {
         E1Demo.Setup setup = E1Demo.createSeededSetup();
         ProductService ps = setup.products();
         InventoryService inv = setup.inventory();
-        Category beverages = ps.findCategory("bebidas").orElseThrow();
+        Category beverages = ps.findCategory("bebidas");
         LocalDateTime now = LocalDateTime.now();
 
         // Cadastro
@@ -56,10 +56,10 @@ public class E1Tests {
                 inv.historyOf("999").size() == 1 && inv.historyOf("999").get(0).type() == MovementType.ENTRY);
 
         // Pesquisa / filtro / ordenação
-        check("CT08 busca por código", ps.findByCode("78910002").isPresent());
+        check("CT08 busca por código", ps.findByCode("78910002") != null);
         check("CT09 busca por nome ignora acento/caixa", ps.searchByName("ype").size() == 1
                 && ps.searchByName("YPÊ").size() == 1);
-        check("CT10 filtro por categoria", ps.filterByCategory(ps.findCategory("Laticínios").orElseThrow()).size() == 2);
+        check("CT10 filtro por categoria", ps.filterByCategory(ps.findCategory("Laticínios")).size() == 2);
         List<Product> byPrice = ps.listSorted(ProductService.SortCriterion.PRICE, false);
         check("CT11 ordenação por preço crescente", byPrice.get(0).price() <= byPrice.get(1).price());
         List<Product> byQty = ps.listSorted(ProductService.SortCriterion.QUANTITY, true);
@@ -86,7 +86,7 @@ public class E1Tests {
 
         // Abaixo do mínimo / sem movimentação
         List<Product> below = inv.listBelowMinimum();
-        check("CT21 abaixo do mínimo detectado (Arroz)", below.stream().anyMatch(p -> p.code().equals("78910005")));
+        check("CT21 abaixo do mínimo detectado (Arroz)", below.contains(ps.requireByCode("78910005")));
         check("CT22 acima do mínimo não aparece (Leite)", !below.contains(milk));
         inv.registerEntry("78910005", 100, "t");
         check("CT23 reposição remove do alerta", !inv.listBelowMinimum().contains(ps.requireByCode("78910005")));

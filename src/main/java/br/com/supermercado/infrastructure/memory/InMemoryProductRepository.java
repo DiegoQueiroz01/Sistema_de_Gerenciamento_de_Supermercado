@@ -8,44 +8,47 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
-/**
- * Mapa por código (busca O(1) e prevenção de duplicados) + lista de categorias.
- * Produtos desativados saem do mapa principal e vão para um mapa à parte.
- */
-public final class InMemoryProductRepository implements ProductRepository {
-    private final Map<String, Product> productsByCode = new LinkedHashMap<>();
-    private final Map<String, Product> inactiveByCode = new LinkedHashMap<>();
+// Produtos ficam num mapa com o código como chave: a busca pelo código é direta
+// e não deixa cadastrar código repetido. Os desativados vão para outro mapa.
+public class InMemoryProductRepository implements ProductRepository {
+    private final Map<String, Product> products = new LinkedHashMap<>();
+    private final Map<String, Product> inactiveProducts = new LinkedHashMap<>();
     private final List<Category> categories = new ArrayList<>();
 
     @Override
     public void save(Product product) {
-        inactiveByCode.remove(product.code());
-        productsByCode.put(product.code(), product);
+        inactiveProducts.remove(product.code());
+        products.put(product.code(), product);
     }
 
     @Override
     public void deactivate(String code) {
-        Product removed = code == null ? null : productsByCode.remove(code.trim());
+        if (code == null) {
+            return;
+        }
+        Product removed = products.remove(code.trim());
         if (removed != null) {
-            inactiveByCode.put(removed.code(), removed);
+            inactiveProducts.put(removed.code(), removed);
         }
     }
 
     @Override
-    public Optional<Product> findByCode(String code) {
-        return code == null ? Optional.empty() : Optional.ofNullable(productsByCode.get(code.trim()));
+    public Product findByCode(String code) {
+        if (code == null) {
+            return null;
+        }
+        return products.get(code.trim());
     }
 
     @Override
     public boolean existsByCode(String code) {
-        return code != null && productsByCode.containsKey(code.trim());
+        return code != null && products.containsKey(code.trim());
     }
 
     @Override
     public List<Product> findAll() {
-        return List.copyOf(productsByCode.values());
+        return new ArrayList<>(products.values());
     }
 
     @Override
@@ -55,6 +58,6 @@ public final class InMemoryProductRepository implements ProductRepository {
 
     @Override
     public List<Category> findAllCategories() {
-        return List.copyOf(categories);
+        return new ArrayList<>(categories);
     }
 }

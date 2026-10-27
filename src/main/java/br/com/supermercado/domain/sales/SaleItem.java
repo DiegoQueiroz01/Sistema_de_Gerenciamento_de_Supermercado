@@ -1,12 +1,14 @@
 package br.com.supermercado.domain.sales;
 
-/**
- * Linha de uma venda. Guarda o nome e o preço do produto no momento da venda,
- * para que o cupom não mude se o cadastro do produto for editado depois.
- */
-public record SaleItem(String productCode, String productName, int quantity, double unitPrice) {
+// Item de uma venda. Guarda o nome e o preço do momento da venda,
+// assim o cupom não muda se o produto for editado depois.
+public class SaleItem {
+    private final String productCode;
+    private final String productName;
+    private final int quantity;
+    private final double unitPrice;
 
-    public SaleItem {
+    public SaleItem(String productCode, String productName, int quantity, double unitPrice) {
         if (productCode == null || productCode.isBlank()) {
             throw new IllegalArgumentException("O código do produto do item é obrigatório.");
         }
@@ -19,9 +21,16 @@ public record SaleItem(String productCode, String productName, int quantity, dou
         if (Double.isNaN(unitPrice) || Double.isInfinite(unitPrice) || unitPrice <= 0) {
             throw new IllegalArgumentException("O preço unitário deve ser maior que zero.");
         }
-        productCode = productCode.trim();
-        productName = productName.trim();
+        this.productCode = productCode.trim();
+        this.productName = productName.trim();
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
     }
+
+    public String productCode() { return productCode; }
+    public String productName() { return productName; }
+    public int quantity() { return quantity; }
+    public double unitPrice() { return unitPrice; }
 
     public double subtotal() {
         return quantity * unitPrice;

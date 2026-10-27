@@ -13,39 +13,124 @@ import br.com.supermercado.domain.product.Product;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
-/**
- * Indicadores de atendimento: caixas abertos, clientes aguardando, total atendido,
- * espera média (geral e por caixa), caixa com mais atendimentos e menor fila.
- * Com os serviços de produtos, estoque e vendas, também monta a visão geral do
- * administrador (estoque, vendas do dia, mais vendidos e atendimento).
- */
-public final class DashboardService {
+// Números para a visão geral: caixas, filas, tempo de espera,
+// e (para o administrador) estoque e vendas do dia.
+public class DashboardService {
     private static final int TOP_SELLING_IN_OVERVIEW = 3;
+
+    // Resumo de um caixa
+    public static class CheckoutSummary {
+        private final String checkoutId;
+        private final boolean open;
+        private final int waiting;
+        private final int attendances;
+        private final Duration averageWait;
+        private final Customer customerInService; // pode ser null
+
+        public CheckoutSummary(String checkoutId, boolean open, int waiting, int attendances,
+                               Duration averageWait, Customer customerInService) {
+            this.checkoutId = checkoutId;
+            this.open = open;
+            this.waiting = waiting;
+            this.attendances = attendances;
+            this.averageWait = averageWait;
+            this.customerInService = customerInService;
+        }
+
+        public String checkoutId() { return checkoutId; }
+        public boolean open() { return open; }
+        public int waiting() { return waiting; }
+        public int attendances() { return attendances; }
+        public Duration averageWait() { return averageWait; }
+        public Customer customerInService() { return customerInService; }
+    }
+
+    // Resumo de todos os caixas
+    public static class QueueOverview {
+        private final int totalCheckouts;
+        private final int openCheckouts;
+        private final int waitingCustomers;
+        private final int totalAttendances;
+        private final Duration averageWait;
+        private final String busiestCheckoutId;       // null se ninguém foi atendido
+        private final String shortestQueueCheckoutId; // null se não há caixa aberto com espaço
+        private final List<CheckoutSummary> checkouts;
+
+        public QueueOverview(int totalCheckouts, int openCheckouts, int waitingCustomers,
+                             int totalAttendances, Duration averageWait, String busiestCheckoutId,
+                             String shortestQueueCheckoutId, List<CheckoutSummary> checkouts) {
+            this.totalCheckouts = totalCheckouts;
+            this.openCheckouts = openCheckouts;
+            this.waitingCustomers = waitingCustomers;
+            this.totalAttendances = totalAttendances;
+            this.averageWait = averageWait;
+            this.busiestCheckoutId = busiestCheckoutId;
+            this.shortestQueueCheckoutId = shortestQueueCheckoutId;
+            this.checkouts = checkouts;
+        }
+
+        public int totalCheckouts() { return totalCheckouts; }
+        public int openCheckouts() { return openCheckouts; }
+        public int waitingCustomers() { return waitingCustomers; }
+        public int totalAttendances() { return totalAttendances; }
+        public Duration averageWait() { return averageWait; }
+        public String busiestCheckoutId() { return busiestCheckoutId; }
+        public String shortestQueueCheckoutId() { return shortestQueueCheckoutId; }
+        public List<CheckoutSummary> checkouts() { return checkouts; }
+    }
+
+    // Visão geral do supermercado (tela do administrador)
+    public static class StoreOverview {
+        private final int activeProducts;
+        private final int belowMinimum;
+        private final int outOfStock;
+        private final double stockValue;
+        private final SalesSummary salesOfDay;
+        private final List<TopSellingProduct> topSelling;
+        private final QueueOverview queues;
+
+        public StoreOverview(int activeProducts, int belowMinimum, int outOfStock, double stockValue,
+                             SalesSummary salesOfDay, List<TopSellingProduct> topSelling,
+                             QueueOverview queues) {
+            this.activeProducts = activeProducts;
+            this.belowMinimum = belowMinimum;
+            this.outOfStock = outOfStock;
+            this.stockValue = stockValue;
+            this.salesOfDay = salesOfDay;
+            this.topSelling = topSelling;
+            this.queues = queues;
+        }
+
+        public int activeProducts() { return activeProducts; }
+        public int belowMinimum() { return belowMinimum; }
+        public int outOfStock() { return outOfStock; }
+        public double stockValue() { return stockValue; }
+        public SalesSummary salesOfDay() { return salesOfDay; }
+        public List<TopSellingProduct> topSelling() { return topSelling; }
+        public QueueOverview queues() { return queues; }
+    }
 
     private final QueueService queues;
     private final ProductService products;
     private final InventoryService inventory;
     private final SaleService sales;
 
-    /** Apenas indicadores de atendimento. */
+    // Só com os caixas (usado na demonstração do módulo de filas)
     public DashboardService(QueueService queues) {
         this(queues, null, null, null);
     }
 
     public DashboardService(QueueService queues, ProductService products, InventoryService inventory,
                             SaleService sales) {
-        this.queues = Objects.requireNonNull(queues, "O serviço de filas é obrigatório.");
+        this.queues = queues;
         this.products = products;
         this.inventory = inventory;
         this.sales = sales;
     }
 
-    /** Visão geral do supermercado na data informada. */
     public StoreOverview storeOverview(LocalDate date) {
         if (products == null || inventory == null || sales == null) {
             throw new IllegalStateException("Visão geral indisponível: faltam os serviços de produtos, estoque e vendas.");
@@ -54,7 +139,9 @@ public final class DashboardService {
         double stockValue = 0;
         List<Product> all = products.listAll();
         for (Product p : all) {
-            if (p.quantity() == 0) outOfStock++;
+            if (p.quantity() == 0) {
+                outOfStock++;
+            }
             stockValue += p.quantity() * p.price();
         }
         return new StoreOverview(
@@ -71,74 +158,45 @@ public final class DashboardService {
         List<Checkout> checkouts = queues.checkouts();
         List<ServiceRecord> records = queues.serviceRecords();
 
-        List<CheckoutSummary> summaries = checkouts.stream()
-                .map(this::summarize)
-                .toList();
-        Optional<String> busiest = summaries.stream()
-                .filter(summary -> summary.attendances() > 0)
-                .max(Comparator.comparingInt(CheckoutSummary::attendances))
-                .map(CheckoutSummary::checkoutId);
-        Optional<String> shortest = queues.shortestOpenCheckout().map(Checkout::id);
+        List<CheckoutSummary> summaries = new ArrayList<>();
+        for (Checkout c : checkouts) {
+            summaries.add(summarize(c));
+        }
 
-        return new QueueOverview(
-                checkouts.size(),
-                queues.openCheckouts().size(),
-                queues.totalWaiting(),
-                records.size(),
-                averageWait(records),
-                busiest,
-                shortest,
-                summaries);
+        // caixa com mais atendimentos (se empatar, fica o primeiro)
+        String busiest = null;
+        int most = 0;
+        for (CheckoutSummary s : summaries) {
+            if (s.attendances() > most) {
+                most = s.attendances();
+                busiest = s.checkoutId();
+            }
+        }
+
+        String shortest = null;
+        Checkout shortestCheckout = queues.shortestOpenCheckout();
+        if (shortestCheckout != null) {
+            shortest = shortestCheckout.id();
+        }
+
+        return new QueueOverview(checkouts.size(), queues.openCheckouts().size(), queues.totalWaiting(),
+                records.size(), averageWait(records), busiest, shortest, summaries);
     }
 
     public Duration averageWait(List<ServiceRecord> records) {
         if (records.isEmpty()) {
             return Duration.ZERO;
         }
-        Duration total = records.stream()
-                .map(ServiceRecord::calculateWaitTime)
-                .reduce(Duration.ZERO, Duration::plus);
+        Duration total = Duration.ZERO;
+        for (ServiceRecord r : records) {
+            total = total.plus(r.calculateWaitTime());
+        }
         return total.dividedBy(records.size());
     }
 
     private CheckoutSummary summarize(Checkout checkout) {
         List<ServiceRecord> records = queues.serviceRecordsOf(checkout.id());
-        return new CheckoutSummary(
-                checkout.id(),
-                checkout.isOpen(),
-                checkout.waitingCount(),
-                records.size(),
-                averageWait(records),
-                checkout.customerInService());
-    }
-
-    public record QueueOverview(
-            int totalCheckouts,
-            int openCheckouts,
-            int waitingCustomers,
-            int totalAttendances,
-            Duration averageWait,
-            Optional<String> busiestCheckoutId,
-            Optional<String> shortestQueueCheckoutId,
-            List<CheckoutSummary> checkouts) {
-    }
-
-    public record StoreOverview(
-            int activeProducts,
-            int belowMinimum,
-            int outOfStock,
-            double stockValue,
-            SalesSummary salesOfDay,
-            List<TopSellingProduct> topSelling,
-            QueueOverview queues) {
-    }
-
-    public record CheckoutSummary(
-            String checkoutId,
-            boolean open,
-            int waiting,
-            int attendances,
-            Duration averageWait,
-            Optional<Customer> customerInService) {
+        return new CheckoutSummary(checkout.id(), checkout.isOpen(), checkout.waitingCount(),
+                records.size(), averageWait(records), checkout.customerInService());
     }
 }
