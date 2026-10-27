@@ -29,7 +29,9 @@ public class E1Tests {
         try { action.run(); return false; } catch (Exception e) { return type.isInstance(e); }
     }
 
-    public static void main(String[] args) {
+    static int run() {
+        passed = 0;
+        failed = 0;
         E1Demo.Setup setup = E1Demo.createSeededSetup();
         ProductService ps = setup.products();
         InventoryService inv = setup.inventory();
@@ -125,6 +127,10 @@ public class E1Tests {
                 () -> ps.registerCategory("  ")));
 
         System.out.println("\nResultado: " + passed + " passaram, " + failed + " falharam.");
-        System.exit(failed == 0 ? 0 : 1);
+        return failed;
+    }
+
+    public static void main(String[] args) {
+        System.exit(run() == 0 ? 0 : 1);
     }
 }

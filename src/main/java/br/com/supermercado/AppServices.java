@@ -7,8 +7,11 @@ import br.com.supermercado.application.product.ProductService;
 import br.com.supermercado.application.reporting.DashboardService;
 import br.com.supermercado.application.sales.SaleService;
 import br.com.supermercado.application.store.SupermarketService;
+import br.com.supermercado.domain.checkout.AttendanceQueue;
+import br.com.supermercado.infrastructure.memory.InMemoryCheckoutRepository;
 import br.com.supermercado.infrastructure.memory.InMemoryProductRepository;
 import br.com.supermercado.infrastructure.memory.InMemorySaleRepository;
+import br.com.supermercado.infrastructure.memory.InMemoryServiceRecordRepository;
 import br.com.supermercado.infrastructure.memory.InMemoryStockMovementRepository;
 import br.com.supermercado.infrastructure.memory.InMemorySupermarketRepository;
 import br.com.supermercado.infrastructure.memory.InMemoryUserRepository;
@@ -44,7 +47,8 @@ public record AppServices(
         InventoryService inventory = new InventoryService(productRepository, movementRepository,
                 SaleService.salesSource(saleRepository));
         SaleService sales = new SaleService(saleRepository, products, inventory);
-        QueueService queues = new QueueService();
+        QueueService queues = new QueueService(new InMemoryCheckoutRepository(),
+                new InMemoryServiceRecordRepository(), AttendanceQueue.DEFAULT_CAPACITY);
         return new AppServices(
                 new AuthService(new InMemoryUserRepository()),
                 new SupermarketService(new InMemorySupermarketRepository()),

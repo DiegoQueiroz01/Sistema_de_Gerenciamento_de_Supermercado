@@ -6,6 +6,8 @@ import br.com.supermercado.application.reporting.DashboardService.QueueOverview;
 import br.com.supermercado.domain.checkout.Checkout;
 import br.com.supermercado.domain.checkout.Customer;
 import br.com.supermercado.domain.checkout.ServiceRecord;
+import br.com.supermercado.infrastructure.memory.InMemoryCheckoutRepository;
+import br.com.supermercado.infrastructure.memory.InMemoryServiceRecordRepository;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -33,7 +35,9 @@ public class E2Tests {
         return checkout.waitingCustomers().stream().map(Customer::ticket).toList();
     }
 
-    public static void main(String[] args) {
+    static int run() {
+        passed = 0;
+        failed = 0;
         LocalDateTime t0 = LocalDateTime.of(2026, 1, 1, 10, 0);
 
         // Caixas
@@ -141,7 +145,28 @@ public class E2Tests {
         check("CF28 demonstração: 3 abertos, 5 aguardando, 2 atendidos", demo.openCheckouts().size() == 3
                 && demo.totalWaiting() == 5 && demo.serviceRecords().size() == 2);
 
+        // Repositórios de caixas e atendimentos
+        InMemoryCheckoutRepository checkoutRepo = new InMemoryCheckoutRepository();
+        InMemoryServiceRecordRepository recordRepo = new InMemoryServiceRecordRepository();
+        QueueService r = new QueueService(checkoutRepo, recordRepo, 10);
+        r.createCheckout();
+        r.openCheckout(" 7 ");
+        check("CF29 caixas gravados no repositório em ordem de criação",
+                checkoutRepo.findAll().stream().map(Checkout::id).toList().equals(List.of("1", "7")));
+        r.registerArrival("Ana", false, t0);
+        r.startNextAttendance("7", t0.plusMinutes(1));
+        check("CF30 atendimento gravado no repositório e indexado por caixa",
+                recordRepo.findAll().size() == 1 && recordRepo.findByCheckoutId("7").size() == 1
+                        && recordRepo.findByCheckoutId("1").isEmpty());
+        r.removeCheckout("1");
+        check("CF31 remoção apaga o caixa do repositório", checkoutRepo.findById("1").isEmpty()
+                && checkoutRepo.findById("7").isPresent());
+
         System.out.println("\nResultado: " + passed + " passaram, " + failed + " falharam.");
-        System.exit(failed == 0 ? 0 : 1);
+        return failed;
+    }
+
+    public static void main(String[] args) {
+        System.exit(run() == 0 ? 0 : 1);
     }
 }
