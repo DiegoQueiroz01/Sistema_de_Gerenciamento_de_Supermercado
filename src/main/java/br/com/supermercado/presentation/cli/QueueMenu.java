@@ -9,31 +9,25 @@ import br.com.supermercado.domain.checkout.Checkout;
 import br.com.supermercado.domain.checkout.Customer;
 import br.com.supermercado.domain.checkout.ServiceRecord;
 
-import java.io.PrintStream;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
-import java.util.Scanner;
 
 /**
  * Menu de caixas e filas: visão geral, abrir/fechar caixas, chegada de clientes,
  * atendimento, consulta de filas, transferência e histórico.
- * Usa Scanner/PrintStream diretamente, como os menus do E.1, enquanto InputReader e
- * TerminalOutput não forem implementados.
+ * A leitura e a escrita são feitas por InputReader e TerminalOutput.
  */
 public final class QueueMenu {
-    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm:ss");
-
-    private final Scanner scanner;
-    private final PrintStream out;
+    private final InputReader in;
+    private final TerminalOutput out;
     private final QueueService queues;
     private final DashboardService dashboard;
 
-    public QueueMenu(Scanner scanner, PrintStream out, QueueService queues,
+    public QueueMenu(InputReader in, TerminalOutput out, QueueService queues,
                      DashboardService dashboard) {
-        this.scanner = scanner;
+        this.in = in;
         this.out = out;
         this.queues = queues;
         this.dashboard = dashboard;
@@ -184,68 +178,28 @@ public final class QueueMenu {
                 .orElseThrow(() -> new IllegalArgumentException("Caixa não encontrado: " + id));
     }
 
-    // ================================================================ formatação
-    static String format(Duration duration) {
-        long total = Math.max(0, duration.getSeconds());
-        return (total / 60) + "m " + String.format("%02d", total % 60) + "s";
-    }
-
-    private static String hour(LocalDateTime dateTime) {
-        return dateTime == null ? "--:--:--" : dateTime.format(HOUR);
-    }
-
     // ================================================================ entrada e saída
+    private static String format(Duration duration) { return TerminalOutput.duration(duration); }
+
+    private static String hour(LocalDateTime dateTime) { return TerminalOutput.hour(dateTime); }
+
     private void println(String text) { out.println(text); }
 
-    private void error(String text) { out.println("  [ERRO] " + text); }
+    private void error(String text) { out.error(text); }
 
-    private void success(String text) { out.println("  [OK] " + text); }
+    private void success(String text) { out.success(text); }
 
-    private void warning(String text) { out.println("  [!] " + text); }
+    private void warning(String text) { out.warning(text); }
 
-    private void title(String title) {
-        out.println();
-        out.println("=== " + title + " ===");
-    }
+    private void title(String title) { out.title(title); }
 
-    private String readLine(String prompt) {
-        out.print(prompt);
-        out.flush();
-        return scanner.nextLine().trim();
-    }
+    private String readLine(String prompt) { return in.readLine(prompt); }
 
-    private String readRequired(String prompt) {
-        while (true) {
-            String text = readLine(prompt);
-            if (!text.isEmpty()) return text;
-            error("Este campo é obrigatório.");
-        }
-    }
+    private String readRequired(String prompt) { return in.readRequired(prompt); }
 
-    private boolean confirm(String prompt) {
-        while (true) {
-            String text = readLine(prompt + " (s/n): ").toLowerCase();
-            if (text.equals("s") || text.equals("sim")) return true;
-            if (text.equals("n") || text.equals("nao") || text.equals("não")) return false;
-            error("Responda com 's' ou 'n'.");
-        }
-    }
+    private boolean confirm(String prompt) { return in.confirm(prompt); }
 
     private int readMenuOption(String title, String... options) {
-        title(title);
-        for (int i = 0; i < options.length; i++) {
-            println("  " + (i + 1) + ") " + options[i]);
-        }
-        println("  0) Voltar/Sair");
-        while (true) {
-            String text = readLine("Escolha: ");
-            try {
-                int value = Integer.parseInt(text);
-                if (value >= 0 && value <= options.length) return value;
-            } catch (NumberFormatException ignored) {
-                // cai na mensagem abaixo
-            }
-            error("Informe um número entre 0 e " + options.length + ".");
-        }
+        return in.readMenuOption(title, options);
     }
 }

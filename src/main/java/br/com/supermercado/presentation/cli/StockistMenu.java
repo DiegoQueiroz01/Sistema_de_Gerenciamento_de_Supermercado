@@ -4,8 +4,6 @@ import br.com.supermercado.application.inventory.InventoryService;
 import br.com.supermercado.application.product.ProductService;
 import br.com.supermercado.domain.product.Product;
 
-import java.io.PrintStream;
-import java.util.Scanner;
 
 /**
  * Menu do ESTOQUISTA (E.1): consultar produtos, registrar entradas, alertas, itens parados e histórico.
@@ -13,9 +11,9 @@ import java.util.Scanner;
  */
 public final class StockistMenu extends StockMenuBase {
 
-    public StockistMenu(Scanner scanner, PrintStream out, ProductService products,
+    public StockistMenu(InputReader in, TerminalOutput out, ProductService products,
                         InventoryService inventory, String responsible) {
-        super(scanner, out, products, inventory, responsible);
+        super(in, out, products, inventory, responsible);
     }
 
     public void run() {

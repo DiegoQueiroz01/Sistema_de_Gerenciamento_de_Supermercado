@@ -2,7 +2,9 @@ package br.com.supermercado;
 
 import br.com.supermercado.application.checkout.QueueService;
 import br.com.supermercado.application.reporting.DashboardService;
+import br.com.supermercado.presentation.cli.InputReader;
 import br.com.supermercado.presentation.cli.QueueMenu;
+import br.com.supermercado.presentation.cli.TerminalOutput;
 
 import java.nio.charset.Charset;
 import java.time.LocalDateTime;
@@ -43,7 +45,8 @@ public final class E2Demo {
                 System.getProperty("stdout.encoding", Charset.defaultCharset().name()));
         QueueService queues = createSeededQueues();
         try (Scanner scanner = new Scanner(System.in, consoleCharset)) {
-            new QueueMenu(scanner, System.out, queues, new DashboardService(queues)).run();
+            TerminalOutput out = new TerminalOutput(System.out);
+            new QueueMenu(new InputReader(scanner, out), out, queues, new DashboardService(queues)).run();
         } catch (NoSuchElementException e) {
             System.out.println("\nEntrada encerrada.");
         }

@@ -5,9 +5,7 @@ import br.com.supermercado.application.product.ProductService;
 import br.com.supermercado.domain.product.Category;
 import br.com.supermercado.domain.product.Product;
 
-import java.io.PrintStream;
 import java.time.LocalDateTime;
-import java.util.Scanner;
 
 /**
  * Parte do menu do ADMINISTRADOR que pertence ao E.1: produtos, categorias e relatórios de estoque.
@@ -15,9 +13,9 @@ import java.util.Scanner;
  */
 public final class ProductAdminMenu extends StockMenuBase {
 
-    public ProductAdminMenu(Scanner scanner, PrintStream out, ProductService products,
+    public ProductAdminMenu(InputReader in, TerminalOutput out, ProductService products,
                             InventoryService inventory, String responsible) {
-        super(scanner, out, products, inventory, responsible);
+        super(in, out, products, inventory, responsible);
     }
 
     public void run() {

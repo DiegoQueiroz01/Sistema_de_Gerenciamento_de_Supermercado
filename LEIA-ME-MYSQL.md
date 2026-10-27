@@ -22,7 +22,7 @@ Se seu usuário não tiver senha, defina `$env:MERCADO_DB_SENHA = ""`. Não colo
 Na pasta que contém `pom.xml`:
 
 ```powershell
-mvn clean compile exec:java
+mvn clean compile exec:java "-Dexec.args=--mysql"
 ```
 
 O Maven baixa o driver JDBC. O programa usa `jdbc:mysql://localhost:3306/mercado_facil` por padrão. Se necessário, defina `MERCADO_DB_URL`.
@@ -31,7 +31,7 @@ O Maven baixa o driver JDBC. O programa usa `jdbc:mysql://localhost:3306/mercado
 - Produtos e categorias são gravados no MySQL.
 - O estoque disponível é reconstruído somando entradas e subtraindo saídas do histórico.
 - Movimentações são preservadas; não apague diretamente produtos que tenham movimentações.
-- A demonstração antiga `E1Demo` em `src/test` usa repositórios em memória e permanece separada. Execute `br.com.supermercado.MercadoFacilApp` para usar o MySQL.
+- Sem `--mysql` o programa roda todo em memória, com dados de exemplo. A opção `--mysql` liga produtos e estoque ao banco.
 - A integração com vendas e o ranking de mais vendidos ainda dependem da fonte de vendas do módulo E.2; o histórico de entradas/saídas do estoque é persistido neste módulo.
 
 ## Observação

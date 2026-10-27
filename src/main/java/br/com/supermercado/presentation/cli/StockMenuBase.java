@@ -8,118 +8,62 @@ import br.com.supermercado.domain.inventory.StockMovement;
 import br.com.supermercado.domain.product.Category;
 import br.com.supermercado.domain.product.Product;
 
-import java.io.PrintStream;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
-import java.util.Scanner;
 
 /**
- * Base dos menus do E.1 (StockistMenu e ProductAdminMenu): leitura validada, mensagens,
- * consultas de produtos/estoque e tabelas de visualização no terminal.
- * Usa Scanner/PrintStream diretamente para o E.1 funcionar sem depender de InputReader/TerminalOutput
- * (que são do E.2); na integração, os métodos de E/S abaixo podem delegar a essas classes.
- * Se o teclado fechar (EOF), Scanner lança NoSuchElementException.
+ * Base dos menus de produtos e estoque (StockistMenu e ProductAdminMenu): consultas de
+ * produtos/estoque e tabelas de visualização no terminal. A leitura e a escrita são
+ * feitas por InputReader e TerminalOutput.
  */
 abstract class StockMenuBase {
-    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-
-    private final Scanner scanner;
-    private final PrintStream out;
+    private final InputReader in;
+    private final TerminalOutput out;
+    private final ProductSelector selector;
     protected final ProductService products;
     protected final InventoryService inventory;
     protected final String responsible;
 
-    protected StockMenuBase(Scanner scanner, PrintStream out, ProductService products,
+    protected StockMenuBase(InputReader in, TerminalOutput out, ProductService products,
                             InventoryService inventory, String responsible) {
-        this.scanner = scanner;
+        this.in = in;
         this.out = out;
         this.products = products;
         this.inventory = inventory;
         this.responsible = responsible;
+        this.selector = new ProductSelector(in, out, products);
     }
 
     // ================================================================ saída
     protected void println(String text) { out.println(text); }
 
-    protected void error(String text) { out.println("  [ERRO] " + text); }
+    protected void error(String text) { out.error(text); }
 
-    protected void success(String text) { out.println("  [OK] " + text); }
+    protected void success(String text) { out.success(text); }
 
-    protected void warning(String text) { out.println("  [!] " + text); }
+    protected void warning(String text) { out.warning(text); }
 
-    protected void title(String title) {
-        out.println();
-        out.println("=== " + title + " ===");
-    }
+    protected void title(String title) { out.title(title); }
 
     private void show(String text) {
-        out.println();
+        out.blank();
         out.println(text);
     }
 
     // ================================================================ entrada validada
-    protected String readLine(String prompt) {
-        out.print(prompt);
-        out.flush();
-        return scanner.nextLine().trim();
-    }
+    protected String readLine(String prompt) { return in.readLine(prompt); }
 
-    protected String readRequired(String prompt) {
-        while (true) {
-            String text = readLine(prompt);
-            if (!text.isEmpty()) return text;
-            error("Este campo é obrigatório.");
-        }
-    }
+    protected String readRequired(String prompt) { return in.readRequired(prompt); }
 
-    protected int readInt(String prompt, int min, int max) {
-        while (true) {
-            String text = readLine(prompt);
-            try {
-                int value = Integer.parseInt(text);
-                if (value >= min && value <= max) return value;
-                error("Informe um número entre " + min + " e " + max + ".");
-            } catch (NumberFormatException e) {
-                error("Entrada inválida: digite um número inteiro.");
-            }
-        }
-    }
+    protected int readInt(String prompt, int min, int max) { return in.readInt(prompt, min, max); }
 
-    /** Aceita vírgula ou ponto como separador decimal; exige valor maior que zero. */
-    protected double readPositiveDecimal(String prompt) {
-        while (true) {
-            String text = readLine(prompt).replace(',', '.');
-            try {
-                double value = Double.parseDouble(text);
-                if (value > 0 && !Double.isInfinite(value)) return value;
-                error("O valor deve ser maior que zero.");
-            } catch (NumberFormatException e) {
-                error("Entrada inválida: digite um número (ex.: 4,20).");
-            }
-        }
-    }
+    protected double readPositiveDecimal(String prompt) { return in.readPositiveDecimal(prompt); }
 
-    protected boolean confirm(String prompt) {
-        while (true) {
-            String text = readLine(prompt + " (s/n): ").toLowerCase();
-            if (text.equals("s") || text.equals("sim")) return true;
-            if (text.equals("n") || text.equals("nao") || text.equals("não")) return false;
-            error("Responda com 's' ou 'n'.");
-        }
-    }
+    protected boolean confirm(String prompt) { return in.confirm(prompt); }
 
-    /** Menu numerado (0 = voltar/sair); devolve a opção escolhida. */
     protected int readMenuOption(String title, String... options) {
-        title(title);
-        for (int i = 0; i < options.length; i++) {
-            println("  " + (i + 1) + ") " + options[i]);
-        }
-        println("  0) Voltar/Sair");
-        return readInt("Escolha: ", 0, options.length);
+        return in.readMenuOption(title, options);
     }
 
     // ================================================================ consultas (comuns ao estoquista e ao administrador)
@@ -202,22 +146,7 @@ abstract class StockMenuBase {
 
     /** Seleciona por código exato ou por parte do nome (lista numerada se houver vários). */
     protected Product selectProduct() {
-        String term = readRequired("Código ou nome do produto: ");
-        Optional<Product> exact = products.findByCode(term);
-        if (exact.isPresent()) return exact.get();
-        List<Product> found = new ArrayList<>(products.searchByName(term));
-        if (found.isEmpty()) {
-            error("Produto não encontrado.");
-            return null;
-        }
-        if (found.size() == 1) return found.get(0);
-        for (int i = 0; i < found.size(); i++) {
-            Product p = found.get(i);
-            println("  " + (i + 1) + ") " + p.code() + " - " + p.name() + " (" + p.quantity() + " un)");
-        }
-        println("  0) Cancelar");
-        int n = readInt("Escolha o produto: ", 0, found.size());
-        return n == 0 ? null : found.get(n - 1);
+        return selector.select("Código ou nome do produto: ");
     }
 
     protected void warnIfBelowMinimum(Product p) {
@@ -228,13 +157,9 @@ abstract class StockMenuBase {
     }
 
     // ================================================================ tabelas
-    protected static String money(double value) {
-        return String.format(Locale.forLanguageTag("pt-BR"), "R$ %,.2f", value);
-    }
+    protected static String money(double value) { return TerminalOutput.money(value); }
 
-    private static String cut(String text, int max) {
-        return text.length() <= max ? text : text.substring(0, max - 1) + "…";
-    }
+    private static String cut(String text, int max) { return TerminalOutput.cut(text, max); }
 
     private static String productsTable(List<Product> list) {
         if (list.isEmpty()) return "  (nenhum produto encontrado)";
@@ -294,5 +219,5 @@ abstract class StockMenuBase {
         return sb.toString().stripTrailing();
     }
 
-    private static String dateTime(LocalDateTime date) { return date.format(DATE_TIME); }
+    private static String dateTime(LocalDateTime date) { return TerminalOutput.dateTime(date); }
 }

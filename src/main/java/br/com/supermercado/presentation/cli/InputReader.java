@@ -1,5 +1,9 @@
 package br.com.supermercado.presentation.cli;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.Objects;
 import java.util.Scanner;
 
@@ -8,6 +12,9 @@ import java.util.Scanner;
  * Se o teclado fechar (EOF), o Scanner lança NoSuchElementException, tratada na aplicação.
  */
 public final class InputReader {
+    private static final DateTimeFormatter DATE =
+            DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
+
     private final Scanner scanner;
     private final TerminalOutput out;
 
@@ -52,6 +59,19 @@ public final class InputReader {
                 out.error("O valor deve ser maior que zero.");
             } catch (NumberFormatException e) {
                 out.error("Entrada inválida: digite um número (ex.: 4,20).");
+            }
+        }
+    }
+
+    /** Data no formato dd/mm/aaaa; vazio devolve {@code defaultDate}. */
+    public LocalDate readDate(String prompt, LocalDate defaultDate) {
+        while (true) {
+            String text = readLine(prompt);
+            if (text.isEmpty() && defaultDate != null) return defaultDate;
+            try {
+                return LocalDate.parse(text, DATE);
+            } catch (DateTimeParseException e) {
+                out.error("Data inválida: use o formato dd/mm/aaaa.");
             }
         }
     }

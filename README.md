@@ -41,17 +41,30 @@ responsabilidades e regras contempladas.
 
 Todos os comandos abaixo são executados na pasta que contém o `pom.xml`.
 
-### Demonstração em memória (sem banco de dados)
+### Aplicação (em memória, sem banco de dados)
 
-Abre os menus do estoquista e do administrador com dados de exemplo já
-carregados, sem login e sem MySQL:
+```bash
+mvn clean compile exec:java
+```
+
+O sistema abre já com produtos, 5 caixas (3 abertos) e um usuário de cada perfil:
+
+| Perfil            | Login    | Senha        |
+|-------------------|----------|--------------|
+| Administrador     | `admin`  | `admin123`   |
+| Estoquista        | `carlos` | `estoque123` |
+| Operador de caixa | `marta`  | `caixa123`   |
+
+### Demonstrações isoladas dos módulos
+
+Menus do estoquista e do administrador (produtos e estoque), sem login:
 
 ```bash
 mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E1Demo -Dexec.classpathScope=test
 ```
 
-Para o menu de caixas e filas, com 5 caixas (3 abertos), 7 clientes e 2
-atendimentos já carregados:
+Menu de caixas e filas, com 5 caixas (3 abertos), 7 clientes e 2 atendimentos já
+carregados:
 
 ```bash
 mvn test-compile exec:java -Dexec.mainClass=br.com.supermercado.E2Demo -Dexec.classpathScope=test
@@ -107,11 +120,14 @@ O resultado aparece no final, por exemplo: `Resultado: 37 passaram, 0 falharam.`
    Por padrão a conexão usa `jdbc:mysql://localhost:3306/mercado_facil`. Para
    outro endereço ou porta, defina também `MERCADO_DB_URL`.
 
-4. Execute:
+4. Execute com a opção `--mysql`:
 
    ```bash
-   mvn clean compile exec:java
+   mvn clean compile exec:java -Dexec.args=--mysql
    ```
+
+   Nesse modo, produtos, categorias e movimentações de estoque ficam no MySQL; os
+   demais dados (usuários, vendas, caixas e filas) ficam em memória durante a sessão.
 
 Não coloque senhas reais em arquivos versionados. Mais detalhes sobre o banco
 estão em [LEIA-ME-MYSQL.md](LEIA-ME-MYSQL.md).

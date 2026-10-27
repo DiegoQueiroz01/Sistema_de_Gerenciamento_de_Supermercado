@@ -14,7 +14,7 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Classe padrão do "mvn exec:java"; pode ser trocada com -Dexec.mainClass=... -->
-        <exec.mainClass>br.com.supermercado.MercadoFacilApp</exec.mainClass>
+        <exec.mainClass>br.com.supermercado.Main</exec.mainClass>
     </properties>
 
     <dependencies>

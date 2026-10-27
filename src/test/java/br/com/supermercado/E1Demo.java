@@ -7,8 +7,10 @@ import br.com.supermercado.application.product.ProductService;
 import br.com.supermercado.domain.product.Category;
 import br.com.supermercado.infrastructure.memory.InMemoryProductRepository;
 import br.com.supermercado.infrastructure.memory.InMemoryStockMovementRepository;
+import br.com.supermercado.presentation.cli.InputReader;
 import br.com.supermercado.presentation.cli.ProductAdminMenu;
 import br.com.supermercado.presentation.cli.StockistMenu;
+import br.com.supermercado.presentation.cli.TerminalOutput;
 
 import java.io.PrintStream;
 import java.nio.charset.Charset;
@@ -95,8 +97,10 @@ public final class E1Demo {
 
     public static void main(String[] args) {
         Charset consoleCharset = Charset.forName(System.getProperty("stdout.encoding", Charset.defaultCharset().name()));
-PrintStream out = System.out;
-Scanner scanner = new Scanner(System.in, consoleCharset);
+        PrintStream out = System.out;
+        Scanner scanner = new Scanner(System.in, consoleCharset);
+        TerminalOutput terminal = new TerminalOutput(out);
+        InputReader in = new InputReader(scanner, terminal);
         Setup s = createSeededSetup();
         try {
             out.println("MERCADO FÁCIL - Módulo E.1 (Controle de Produtos e Estoque) - modo demonstração");
@@ -110,9 +114,9 @@ Scanner scanner = new Scanner(System.in, consoleCharset);
                 String text = scanner.nextLine().trim();
                 option = text.equals("1") ? 1 : text.equals("2") ? 2 : text.equals("0") ? 0 : -1;
                 if (option == 1) {
-                    new StockistMenu(scanner, out, s.products(), s.inventory(), "Carlos Oliveira").run();
+                    new StockistMenu(in, terminal, s.products(), s.inventory(), "Carlos Oliveira").run();
                 } else if (option == 2) {
-                    new ProductAdminMenu(scanner, out, s.products(), s.inventory(), "Juliana Silva").run();
+                    new ProductAdminMenu(in, terminal, s.products(), s.inventory(), "Juliana Silva").run();
                 } else if (option == -1) {
                     out.println("  [ERRO] Opção inválida.");
                 }
