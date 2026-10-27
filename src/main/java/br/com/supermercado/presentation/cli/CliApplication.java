@@ -25,7 +25,7 @@ public final class CliApplication {
 
     public void run() {
         out.println("==========================================");
-        out.println("  MERCADO FÁCIL - Gerenciamento de Supermercado");
+        out.println("  " + app.store().current().name().toUpperCase() + " - Gerenciamento de Supermercado");
         out.println("  Armazenamento: " + storageDescription);
         out.println("==========================================");
         int option;

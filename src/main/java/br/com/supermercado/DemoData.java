@@ -14,6 +14,12 @@ public final class DemoData {
 
     private DemoData() {}
 
+    /** Dados cadastrais de exemplo do estabelecimento. */
+    public static void loadStore(AppServices app) {
+        app.store().update("Mercado Fácil", "11.222.333/0001-81",
+                "Av. Brasil, 1500 - Centro", "(11) 3333-4444");
+    }
+
     /** Usuários de exemplo, um por perfil (o administrador padrão é criado pelo AuthService). */
     public static void loadUsers(AppServices app) {
         app.auth().ensureDefaultAdmin();

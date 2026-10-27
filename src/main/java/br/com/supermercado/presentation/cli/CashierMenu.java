@@ -4,6 +4,7 @@ import br.com.supermercado.application.checkout.QueueService;
 import br.com.supermercado.application.product.ProductService;
 import br.com.supermercado.application.sales.Cart;
 import br.com.supermercado.application.sales.SaleService;
+import br.com.supermercado.application.store.SupermarketService;
 import br.com.supermercado.domain.checkout.Checkout;
 import br.com.supermercado.domain.checkout.Customer;
 import br.com.supermercado.domain.product.Product;
@@ -24,15 +25,17 @@ public final class CashierMenu {
     private final TerminalOutput out;
     private final SaleService sales;
     private final QueueService queues;
+    private final SupermarketService store;
     private final ProductSelector selector;
     private final String cashier;
 
     public CashierMenu(InputReader in, TerminalOutput out, SaleService sales, ProductService products,
-                       QueueService queues, String cashier) {
+                       QueueService queues, SupermarketService store, String cashier) {
         this.in = in;
         this.out = out;
         this.sales = sales;
         this.queues = queues;
+        this.store = store;
         this.selector = new ProductSelector(in, out, products);
         this.cashier = cashier;
     }
@@ -154,7 +157,7 @@ public final class CashierMenu {
         Sale sale = sales.finalizeSale(cart, cashier, checkoutId, ticket, LocalDateTime.now());
         out.success("Venda " + String.format("%06d", sale.id()) + " registrada. Estoque atualizado.");
         out.blank();
-        out.println(SaleViews.receipt(sale, null));
+        out.println(SaleViews.receipt(sale, store.receiptHeader()));
         return true;
     }
 
@@ -169,6 +172,6 @@ public final class CashierMenu {
         Sale sale = sales.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Venda não encontrada: " + id));
         out.blank();
-        out.println(SaleViews.receipt(sale, null));
+        out.println(SaleViews.receipt(sale, store.receiptHeader()));
     }
 }

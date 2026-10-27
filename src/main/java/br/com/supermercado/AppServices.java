@@ -6,9 +6,11 @@ import br.com.supermercado.application.inventory.InventoryService;
 import br.com.supermercado.application.product.ProductService;
 import br.com.supermercado.application.reporting.DashboardService;
 import br.com.supermercado.application.sales.SaleService;
+import br.com.supermercado.application.store.SupermarketService;
 import br.com.supermercado.infrastructure.memory.InMemoryProductRepository;
 import br.com.supermercado.infrastructure.memory.InMemorySaleRepository;
 import br.com.supermercado.infrastructure.memory.InMemoryStockMovementRepository;
+import br.com.supermercado.infrastructure.memory.InMemorySupermarketRepository;
 import br.com.supermercado.infrastructure.memory.InMemoryUserRepository;
 import br.com.supermercado.infrastructure.mysql.MySQLProductRepository;
 import br.com.supermercado.infrastructure.mysql.MySQLStockMovementRepository;
@@ -18,6 +20,7 @@ import br.com.supermercado.repositories.StockMovementRepository;
 /** Serviços da aplicação já ligados aos repositórios escolhidos. */
 public record AppServices(
         AuthService auth,
+        SupermarketService store,
         ProductService products,
         InventoryService inventory,
         SaleService sales,
@@ -44,6 +47,7 @@ public record AppServices(
         QueueService queues = new QueueService();
         return new AppServices(
                 new AuthService(new InMemoryUserRepository()),
+                new SupermarketService(new InMemorySupermarketRepository()),
                 products,
                 inventory,
                 sales,

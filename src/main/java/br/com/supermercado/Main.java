@@ -41,6 +41,7 @@ public final class Main {
             DemoData.loadProducts(app);
             storage = "memória, com dados de exemplo (use --mysql para o banco)";
         }
+        DemoData.loadStore(app);
         DemoData.loadUsers(app);
         DemoData.loadCheckouts(app);
 

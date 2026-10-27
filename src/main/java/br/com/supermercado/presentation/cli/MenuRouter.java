@@ -43,7 +43,8 @@ public final class MenuRouter {
             option = in.readMenuWithZeroLabel("OPERADOR DE CAIXA - " + user.name(), "Sair (logout)",
                     "Vendas", "Caixas e filas (atendimento)", "Alterar minha senha");
             switch (option) {
-                case 1 -> new CashierMenu(in, out, app.sales(), app.products(), app.queues(), user.name()).run();
+                case 1 -> new CashierMenu(in, out, app.sales(), app.products(), app.queues(), app.store(),
+                        user.name()).run();
                 case 2 -> new QueueMenu(in, out, app.queues(), app.dashboard()).run();
                 case 3 -> UserAdminMenu.changeOwnPassword(in, out, app.auth(), user);
                 default -> { }
